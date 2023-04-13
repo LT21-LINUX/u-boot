@@ -1,17 +1,14 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2011
  * Corscience GmbH & Co. KG - Simon Schwarz <schwarz@corscience.de>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <command.h>
 #include <cmd_spl.h>
-#include <env.h>
-#include <image.h>
-#include <log.h>
-#include <asm/global_data.h>
-#include <linux/libfdt.h>
+#include <libfdt.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -32,7 +29,11 @@ static const char **subcmd_list[] = {
 		NULL,
 	},
 	[SPL_EXPORT_ATAGS] = (const char * []) {
-#ifdef CONFIG_SUPPORT_PASSING_ATAGS
+#if defined(CONFIG_SETUP_MEMORY_TAGS) || \
+	defined(CONFIG_CMDLINE_TAG) || \
+	defined(CONFIG_INITRD_TAG) || \
+	defined(CONFIG_SERIAL_TAG) || \
+	defined(CONFIG_REVISION_TAG)
 		"start",
 		"loados",
 #ifdef CONFIG_SYS_BOOT_RAMDISK_HIGH
@@ -48,7 +49,7 @@ static const char **subcmd_list[] = {
 };
 
 /* Calls bootm with the parameters given */
-static int call_bootm(int argc, char *const argv[], const char *subcommand[])
+static int call_bootm(int argc, char * const argv[], const char *subcommand[])
 {
 	char *bootm_argv[5];
 
@@ -94,38 +95,35 @@ static int call_bootm(int argc, char *const argv[], const char *subcommand[])
 	return 0;
 }
 
-static struct cmd_tbl cmd_spl_export_sub[] = {
+static cmd_tbl_t cmd_spl_export_sub[] = {
 	U_BOOT_CMD_MKENT(fdt, 0, 1, (void *)SPL_EXPORT_FDT, "", ""),
 	U_BOOT_CMD_MKENT(atags, 0, 1, (void *)SPL_EXPORT_ATAGS, "", ""),
 };
 
-static int spl_export(struct cmd_tbl *cmdtp, int flag, int argc,
-		      char *const argv[])
+static int spl_export(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	const struct cmd_tbl *c;
+	const cmd_tbl_t *c;
 
 	if (argc < 2) /* no subcommand */
 		return cmd_usage(cmdtp);
 
 	c = find_cmd_tbl(argv[1], &cmd_spl_export_sub[0],
 		ARRAY_SIZE(cmd_spl_export_sub));
-	if ((c) && ((long)c->cmd <= SPL_EXPORT_LAST)) {
+	if ((c) && ((int)c->cmd <= SPL_EXPORT_LAST)) {
 		argc -= 2;
 		argv += 2;
-		if (call_bootm(argc, argv, subcmd_list[(long)c->cmd]))
+		if (call_bootm(argc, argv, subcmd_list[(int)c->cmd]))
 			return -1;
-		switch ((long)c->cmd) {
+		switch ((int)c->cmd) {
 #ifdef CONFIG_OF_LIBFDT
 		case SPL_EXPORT_FDT:
 			printf("Argument image is now in RAM: 0x%p\n",
 				(void *)images.ft_addr);
 			env_set_addr("fdtargsaddr", images.ft_addr);
 			env_set_hex("fdtargslen", fdt_totalsize(images.ft_addr));
-#ifdef CONFIG_CMD_SPL_WRITE_SIZE
 			if (fdt_totalsize(images.ft_addr) >
 			    CONFIG_CMD_SPL_WRITE_SIZE)
 				puts("WARN: FDT size > CMD_SPL_WRITE_SIZE\n");
-#endif
 			break;
 #endif
 		case SPL_EXPORT_ATAGS:
@@ -141,13 +139,13 @@ static int spl_export(struct cmd_tbl *cmdtp, int flag, int argc,
 	return 0;
 }
 
-static struct cmd_tbl cmd_spl_sub[] = {
+static cmd_tbl_t cmd_spl_sub[] = {
 	U_BOOT_CMD_MKENT(export, 0, 1, (void *)SPL_EXPORT, "", ""),
 };
 
-static int do_spl(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+static int do_spl(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 {
-	const struct cmd_tbl *c;
+	const cmd_tbl_t *c;
 	int cmd;
 
 	if (argc < 2) /* no subcommand */
@@ -155,7 +153,7 @@ static int do_spl(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 
 	c = find_cmd_tbl(argv[1], &cmd_spl_sub[0], ARRAY_SIZE(cmd_spl_sub));
 	if (c) {
-		cmd = (long)c->cmd;
+		cmd = (int)c->cmd;
 		switch (cmd) {
 		case SPL_EXPORT:
 			argc--;

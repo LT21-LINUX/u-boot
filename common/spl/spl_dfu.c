@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2016
  * Texas Instruments, <www.ti.com>
  *
  * Ravi B <ravibabu@ti.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 #include <common.h>
-#include <env.h>
 #include <spl.h>
 #include <linux/compiler.h>
 #include <errno.h>
@@ -15,6 +15,7 @@
 #include <g_dnl.h>
 #include <usb.h>
 #include <dfu.h>
+#include <environment.h>
 
 static int run_dfu(int usb_index, char *interface, char *devstring)
 {
@@ -38,16 +39,16 @@ int spl_dfu_cmd(int usbctrl, char *dfu_alt_info, char *interface, char *devstr)
 	int ret;
 
 	/* set default environment */
-	env_set_default(NULL, 0);
+	set_default_env(0);
 	str_env = env_get(dfu_alt_info);
 	if (!str_env) {
-		pr_err("\"%s\" env variable not defined!\n", dfu_alt_info);
+		error("\"dfu_alt_info\" env variable not defined!\n");
 		return -EINVAL;
 	}
 
 	ret = env_set("dfu_alt_info", str_env);
 	if (ret) {
-		pr_err("unable to set env variable \"dfu_alt_info\"!\n");
+		error("unable to set env variable \"dfu_alt_info\"!\n");
 		return -EINVAL;
 	}
 

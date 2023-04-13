@@ -1,21 +1,18 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
- * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
- * Author(s): Patrice Chotard, <patrice.chotard@foss.st.com> for STMicroelectronics.
+ * Copyright (c) 2017
+ * Patrice Chotard <patrice.chotard@st.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <errno.h>
-#include <log.h>
-#include <malloc.h>
 #include <wait_bit.h>
 #include <dm.h>
 #include <reset-uclass.h>
 #include <regmap.h>
 #include <syscon.h>
-#include <asm/global_data.h>
 #include <dt-bindings/reset/stih407-resets.h>
-#include <linux/bitops.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -204,24 +201,24 @@ phys_addr_t sti_reset_get_regmap(const char *compatible)
 	node = fdt_node_offset_by_compatible(gd->fdt_blob, -1,
 					     compatible);
 	if (node < 0) {
-		pr_err("unable to find %s node\n", compatible);
+		error("unable to find %s node\n", compatible);
 		return node;
 	}
 
 	ret = uclass_get_device_by_of_offset(UCLASS_SYSCON, node, &syscon);
 	if (ret) {
-		pr_err("%s: uclass_get_device_by_of_offset failed: %d\n",
+		error("%s: uclass_get_device_by_of_offset failed: %d\n",
 		      __func__, ret);
 		return ret;
 	}
 
 	regmap = syscon_get_regmap(syscon);
 	if (!regmap) {
-		pr_err("unable to get regmap for %s\n", syscon->name);
+		error("unable to get regmap for %s\n", syscon->name);
 		return -ENODEV;
 	}
 
-	return regmap->ranges[0].start;
+	return regmap->base;
 }
 
 static int sti_reset_program_hw(struct reset_ctl *reset_ctl, int assert)
@@ -254,7 +251,7 @@ static int sti_reset_program_hw(struct reset_ctl *reset_ctl, int assert)
 			if (ch->deassert_cnt > 0)
 				return 0;
 		} else
-			pr_err("Reset balancing error: reset_ctl=%p dev=%p id=%lu\n",
+			error("Reset balancing error: reset_ctl=%p dev=%p id=%lu\n",
 			      reset_ctl, reset_ctl->dev, reset_ctl->id);
 	}
 
@@ -269,14 +266,24 @@ static int sti_reset_program_hw(struct reset_ctl *reset_ctl, int assert)
 		return 0;
 
 	reg = (void __iomem *)base + ch->ack_offset;
-	if (wait_for_bit_le32(reg, BIT(ch->ack_bit), ctrl_val,
-			      1000, false)) {
-		pr_err("Stuck on waiting ack reset_ctl=%p dev=%p id=%lu\n",
+	if (wait_for_bit(__func__, reg, BIT(ch->ack_bit), ctrl_val,
+			 1000, false)) {
+		error("Stuck on waiting ack reset_ctl=%p dev=%p id=%lu\n",
 		      reset_ctl, reset_ctl->dev, reset_ctl->id);
 
 		return -ETIMEDOUT;
 	}
 
+	return 0;
+}
+
+static int sti_reset_request(struct reset_ctl *reset_ctl)
+{
+	return 0;
+}
+
+static int sti_reset_free(struct reset_ctl *reset_ctl)
+{
 	return 0;
 }
 
@@ -291,6 +298,8 @@ static int sti_reset_deassert(struct reset_ctl *reset_ctl)
 }
 
 struct reset_ops sti_reset_ops = {
+	.request = sti_reset_request,
+	.free = sti_reset_free,
 	.rst_assert = sti_reset_assert,
 	.rst_deassert = sti_reset_deassert,
 };
@@ -325,6 +334,6 @@ U_BOOT_DRIVER(sti_reset) = {
 	.id = UCLASS_RESET,
 	.of_match = sti_reset_ids,
 	.probe = sti_reset_probe,
-	.priv_auto	= sizeof(struct sti_reset),
+	.priv_auto_alloc_size = sizeof(struct sti_reset),
 	.ops = &sti_reset_ops,
 };

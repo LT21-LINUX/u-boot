@@ -1,6 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright 2014-2017 Broadcom.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifdef BCM_GMAC_DEBUG
@@ -11,15 +12,10 @@
 
 #include <config.h>
 #include <common.h>
-#include <cpu_func.h>
-#include <log.h>
 #include <malloc.h>
 #include <net.h>
-#include <asm/cache.h>
 #include <asm/io.h>
 #include <phy.h>
-#include <linux/delay.h>
-#include <linux/bitops.h>
 
 #include "bcm-sf2-eth.h"
 #include "bcm-sf2-eth-gmac.h"
@@ -614,7 +610,7 @@ int gmac_miiphy_read(struct mii_dev *bus, int phyaddr, int devad, int reg)
 
 	/* Busy wait timeout is 1ms */
 	if (gmac_mii_busywait(1000)) {
-		pr_err("%s: Prepare MII read: MII/MDIO busy\n", __func__);
+		error("%s: Prepare MII read: MII/MDIO busy\n", __func__);
 		return -1;
 	}
 
@@ -626,7 +622,7 @@ int gmac_miiphy_read(struct mii_dev *bus, int phyaddr, int devad, int reg)
 	writel(tmp, GMAC_MII_DATA_ADDR);
 
 	if (gmac_mii_busywait(1000)) {
-		pr_err("%s: MII read failure: MII/MDIO busy\n", __func__);
+		error("%s: MII read failure: MII/MDIO busy\n", __func__);
 		return -1;
 	}
 
@@ -642,7 +638,7 @@ int gmac_miiphy_write(struct mii_dev *bus, int phyaddr, int devad, int reg,
 
 	/* Busy wait timeout is 1ms */
 	if (gmac_mii_busywait(1000)) {
-		pr_err("%s: Prepare MII write: MII/MDIO busy\n", __func__);
+		error("%s: Prepare MII write: MII/MDIO busy\n", __func__);
 		return -1;
 	}
 
@@ -655,7 +651,7 @@ int gmac_miiphy_write(struct mii_dev *bus, int phyaddr, int devad, int reg,
 	writel(tmp, GMAC_MII_DATA_ADDR);
 
 	if (gmac_mii_busywait(1000)) {
-		pr_err("%s: MII write failure: MII/MDIO busy\n", __func__);
+		error("%s: MII write failure: MII/MDIO busy\n", __func__);
 		return -1;
 	}
 
@@ -746,7 +742,7 @@ int gmac_set_speed(int speed, int duplex)
 	} else if (speed == 10) {
 		speed_cfg = 0;
 	} else {
-		pr_err("%s: Invalid GMAC speed(%d)!\n", __func__, speed);
+		error("%s: Invalid GMAC speed(%d)!\n", __func__, speed);
 		return -1;
 	}
 
@@ -824,7 +820,7 @@ int gmac_mac_init(struct eth_device *dev)
 	writel(0, GMAC0_INT_STATUS_ADDR);
 
 	if (dma_init(dma) < 0) {
-		pr_err("%s: GMAC dma_init failed\n", __func__);
+		error("%s: GMAC dma_init failed\n", __func__);
 		goto err_exit;
 	}
 
@@ -859,7 +855,7 @@ int gmac_mac_init(struct eth_device *dev)
 	writel(tmp, GMAC_MII_CTRL_ADDR);
 
 	if (gmac_mii_busywait(1000)) {
-		pr_err("%s: Configure MDIO: MII/MDIO busy\n", __func__);
+		error("%s: Configure MDIO: MII/MDIO busy\n", __func__);
 		goto err_exit;
 	}
 

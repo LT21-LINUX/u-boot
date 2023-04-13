@@ -1,4 +1,3 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * sun8i H3 platform dram controller register and constant defines
  *
@@ -7,12 +6,12 @@
  * (C) Copyright 2015      Vishnu Patekar <vishnupatekar0510@gmail.com>
  * (C) Copyright 2014-2015 Hans de Goede <hdegoede@redhat.com>
  * (C) Copyright 2015      Jens Kuske <jenskuske@gmail.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _SUNXI_DRAM_SUN8I_H3_H
 #define _SUNXI_DRAM_SUN8I_H3_H
-
-#include <linux/bitops.h>
 
 struct sunxi_mctl_com_reg {
 	u32 cr;			/* 0x00 control register */
@@ -212,20 +211,16 @@ struct sunxi_mctl_ctl_reg {
  * the 32-bit wide access consists of. Also three control signals can be
  * adjusted individually.
  */
+#define BITS_PER_BYTE		8
 #define NR_OF_BYTE_LANES	(32 / BITS_PER_BYTE)
 /* The eight data lines (DQn) plus DM, DQS and DQSN */
 #define LINES_PER_BYTE_LANE	(BITS_PER_BYTE + 3)
-
-struct rank_para {
+struct dram_para {
 	u16 page_size;
+	u8 bus_full_width;
+	u8 dual_rank;
 	u8 row_bits;
 	u8 bank_bits;
-};
-
-struct dram_para {
-	u8 dual_rank;
-	u8 bus_full_width;
-	struct rank_para ranks[2];
 	const u8 dx_read_delays[NR_OF_BYTE_LANES][LINES_PER_BYTE_LANE];
 	const u8 dx_write_delays[NR_OF_BYTE_LANES][LINES_PER_BYTE_LANE];
 	const u8 ac_delays[31];

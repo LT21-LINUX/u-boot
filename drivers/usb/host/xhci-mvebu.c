@@ -1,21 +1,23 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Copyright (C) 2015 Marvell International Ltd.
  *
  * MVEBU USB HOST xHCI Controller
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
-#include <log.h>
 #include <usb.h>
 #include <power/regulator.h>
 #include <asm/gpio.h>
 
-#include <usb/xhci.h>
+#include "xhci.h"
 
-struct mvebu_xhci_plat {
+DECLARE_GLOBAL_DATA_PTR;
+
+struct mvebu_xhci_platdata {
 	fdt_addr_t hcd_base;
 };
 
@@ -25,7 +27,7 @@ struct mvebu_xhci_plat {
  */
 struct mvebu_xhci {
 	struct xhci_ctrl ctrl;	/* Needs to come first in this struct! */
-	struct usb_plat usb_plat;
+	struct usb_platdata usb_plat;
 	struct xhci_hccr *hcd;
 };
 
@@ -33,14 +35,14 @@ struct mvebu_xhci {
  * Dummy implementation that can be overwritten by a board
  * specific function
  */
-__weak int board_xhci_enable(fdt_addr_t base)
+__weak int board_xhci_enable(void)
 {
 	return 0;
 }
 
 static int xhci_usb_probe(struct udevice *dev)
 {
-	struct mvebu_xhci_plat *plat = dev_get_plat(dev);
+	struct mvebu_xhci_platdata *plat = dev_get_platdata(dev);
 	struct mvebu_xhci *ctx = dev_get_priv(dev);
 	struct xhci_hcor *hcor;
 	int len, ret;
@@ -60,19 +62,19 @@ static int xhci_usb_probe(struct udevice *dev)
 	}
 
 	/* Enable USB xHCI (VBUS, reset etc) in board specific code */
-	board_xhci_enable(devfdt_get_addr_index(dev, 1));
+	board_xhci_enable();
 
 	return xhci_register(dev, ctx->hcd, hcor);
 }
 
-static int xhci_usb_of_to_plat(struct udevice *dev)
+static int xhci_usb_ofdata_to_platdata(struct udevice *dev)
 {
-	struct mvebu_xhci_plat *plat = dev_get_plat(dev);
+	struct mvebu_xhci_platdata *plat = dev_get_platdata(dev);
 
 	/*
 	 * Get the base address for XHCI controller from the device node
 	 */
-	plat->hcd_base = dev_read_addr(dev);
+	plat->hcd_base = devfdt_get_addr(dev);
 	if (plat->hcd_base == FDT_ADDR_T_NONE) {
 		debug("Can't get the XHCI register base address\n");
 		return -ENXIO;
@@ -83,7 +85,6 @@ static int xhci_usb_of_to_plat(struct udevice *dev)
 
 static const struct udevice_id xhci_usb_ids[] = {
 	{ .compatible = "marvell,armada3700-xhci" },
-	{ .compatible = "marvell,armada-380-xhci" },
 	{ .compatible = "marvell,armada-8k-xhci" },
 	{ }
 };
@@ -92,11 +93,11 @@ U_BOOT_DRIVER(usb_xhci) = {
 	.name	= "xhci_mvebu",
 	.id	= UCLASS_USB,
 	.of_match = xhci_usb_ids,
-	.of_to_plat = xhci_usb_of_to_plat,
+	.ofdata_to_platdata = xhci_usb_ofdata_to_platdata,
 	.probe = xhci_usb_probe,
 	.remove = xhci_deregister,
 	.ops	= &xhci_usb_ops,
-	.plat_auto	= sizeof(struct mvebu_xhci_plat),
-	.priv_auto	= sizeof(struct mvebu_xhci),
+	.platdata_auto_alloc_size = sizeof(struct mvebu_xhci_platdata),
+	.priv_auto_alloc_size = sizeof(struct mvebu_xhci),
 	.flags	= DM_FLAG_ALLOC_PRIV_DMA,
 };

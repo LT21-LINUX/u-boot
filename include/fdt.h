@@ -1,1 +1,1 @@
-#include "../scripts/dtc/libfdt/fdt.h"
+#include <../lib/libfdt/fdt.h>

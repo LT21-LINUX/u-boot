@@ -1,16 +1,20 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  *  Copyright (C) 2015 Samsung Electronics
  *  Przemyslaw Marczak  <p.marczak@samsung.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
 #include <fdtdec.h>
 #include <errno.h>
 #include <dm.h>
+#include <i2c.h>
 #include <power/pmic.h>
 #include <power/regulator.h>
 #include <power/sandbox_pmic.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 #define MODE(_id, _val, _name) [_id] = {  \
 	.id = _id,                \
@@ -83,7 +87,7 @@ int out_get_value(struct udevice *dev, int output_count, int reg_type,
 	int ret;
 
 	if (dev->driver_data > output_count) {
-		pr_err("Unknown regulator number: %lu for PMIC %s!",
+		error("Unknown regulator number: %lu for PMIC %s!",
 		      dev->driver_data, dev->name);
 		return -EINVAL;
 	}
@@ -91,7 +95,7 @@ int out_get_value(struct udevice *dev, int output_count, int reg_type,
 	reg = (dev->driver_data - 1) * OUT_REG_COUNT + reg_type;
 	ret = pmic_read(dev->parent, reg, &reg_val, 1);
 	if (ret) {
-		pr_err("PMIC read failed: %d\n",  ret);
+		error("PMIC read failed: %d\n",  ret);
 		return ret;
 	}
 
@@ -111,14 +115,14 @@ static int out_set_value(struct udevice *dev, int output_count, int reg_type,
 	int max_value;
 
 	if (dev->driver_data > output_count) {
-		pr_err("Unknown regulator number: %lu for PMIC %s!",
+		error("Unknown regulator number: %lu for PMIC %s!",
 		      dev->driver_data, dev->name);
 		return -EINVAL;
 	}
 
 	max_value = range[dev->driver_data - 1].max;
 	if (value > max_value) {
-		pr_err("Wrong value for %s: %lu. Max is: %d.",
+		error("Wrong value for %s: %lu. Max is: %d.",
 		      dev->name, dev->driver_data, max_value);
 		return -EINVAL;
 	}
@@ -130,7 +134,7 @@ static int out_set_value(struct udevice *dev, int output_count, int reg_type,
 	reg = (dev->driver_data - 1) * OUT_REG_COUNT + reg_type;
 	ret = pmic_write(dev->parent, reg, &reg_val, 1);
 	if (ret) {
-		pr_err("PMIC write failed: %d\n",  ret);
+		error("PMIC write failed: %d\n",  ret);
 		return ret;
 	}
 
@@ -139,18 +143,18 @@ static int out_set_value(struct udevice *dev, int output_count, int reg_type,
 
 static int out_get_mode(struct udevice *dev)
 {
-	struct dm_regulator_uclass_plat *uc_pdata;
+	struct dm_regulator_uclass_platdata *uc_pdata;
 	uint8_t reg_val;
 	uint reg;
 	int ret;
 	int i;
 
-	uc_pdata = dev_get_uclass_plat(dev);
+	uc_pdata = dev_get_uclass_platdata(dev);
 
 	reg = (dev->driver_data - 1) * OUT_REG_COUNT + OUT_REG_OM;
 	ret = pmic_read(dev->parent, reg, &reg_val, 1);
 	if (ret) {
-		pr_err("PMIC read failed: %d\n",  ret);
+		error("PMIC read failed: %d\n",  ret);
 		return ret;
 	}
 
@@ -159,19 +163,19 @@ static int out_get_mode(struct udevice *dev)
 			return uc_pdata->mode[i].id;
 	}
 
-	pr_err("Unknown operation mode for %s!", dev->name);
+	error("Unknown operation mode for %s!", dev->name);
 	return -EINVAL;
 }
 
 static int out_set_mode(struct udevice *dev, int mode)
 {
-	struct dm_regulator_uclass_plat *uc_pdata;
+	struct dm_regulator_uclass_platdata *uc_pdata;
 	int reg_val = -1;
 	uint reg;
 	int ret;
 	int i;
 
-	uc_pdata = dev_get_uclass_plat(dev);
+	uc_pdata = dev_get_uclass_platdata(dev);
 
 	if (mode >= uc_pdata->mode_count)
 		return -EINVAL;
@@ -184,14 +188,14 @@ static int out_set_mode(struct udevice *dev, int mode)
 	}
 
 	if (reg_val == -1) {
-		pr_err("Unknown operation mode for %s!", dev->name);
+		error("Unknown operation mode for %s!", dev->name);
 		return -EINVAL;
 	}
 
 	reg = (dev->driver_data - 1) * OUT_REG_COUNT + OUT_REG_OM;
 	ret = pmic_write(dev->parent, reg, (uint8_t *)&reg_val, 1);
 	if (ret) {
-		pr_err("PMIC write failed: %d\n",  ret);
+		error("PMIC write failed: %d\n",  ret);
 		return ret;
 	}
 
@@ -245,9 +249,9 @@ static int buck_set_enable(struct udevice *dev, bool enable)
 
 static int sandbox_buck_probe(struct udevice *dev)
 {
-	struct dm_regulator_uclass_plat *uc_pdata;
+	struct dm_regulator_uclass_platdata *uc_pdata;
 
-	uc_pdata = dev_get_uclass_plat(dev);
+	uc_pdata = dev_get_uclass_platdata(dev);
 
 	uc_pdata->type = REGULATOR_TYPE_BUCK;
 	uc_pdata->mode = sandbox_buck_modes;
@@ -321,9 +325,9 @@ static int ldo_set_enable(struct udevice *dev, bool enable)
 
 static int sandbox_ldo_probe(struct udevice *dev)
 {
-	struct dm_regulator_uclass_plat *uc_pdata;
+	struct dm_regulator_uclass_platdata *uc_pdata;
 
-	uc_pdata = dev_get_uclass_plat(dev);
+	uc_pdata = dev_get_uclass_platdata(dev);
 
 	uc_pdata->type = REGULATOR_TYPE_LDO;
 	uc_pdata->mode = sandbox_ldo_modes;

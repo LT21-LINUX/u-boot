@@ -1,14 +1,21 @@
-/* SPDX-License-Identifier: GPL-2.0+ */
 /*
  * (C) Copyright 2013
  * David Feng <fenghua@phytium.com.cn>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #ifndef _ASM_ARMV8_MMU_H_
 #define _ASM_ARMV8_MMU_H_
 
-#include <hang.h>
-#include <linux/const.h>
+/***************************************************************/
+/*
+ * The following definitions are related each other, shoud be
+ * calculated specifically.
+ */
+
+#define VA_BITS			CONFIG_SYS_VA_BITS
+#define PTE_BLOCK_BITS		CONFIG_SYS_PTL2_BITS
 
 /*
  * block/section address mask and size definitions.
@@ -18,7 +25,7 @@
 #undef  PAGE_SIZE
 #define PAGE_SHIFT		12
 #define PAGE_SIZE		(1 << PAGE_SHIFT)
-#define PAGE_MASK		(~(PAGE_SIZE - 1))
+#define PAGE_MASK		(~(PAGE_SIZE-1))
 
 /***************************************************************/
 
@@ -45,7 +52,6 @@
 #define PTE_TYPE_MASK		(3 << 0)
 #define PTE_TYPE_FAULT		(0 << 0)
 #define PTE_TYPE_TABLE		(3 << 0)
-#define PTE_TYPE_PAGE		(3 << 0)
 #define PTE_TYPE_BLOCK		(1 << 0)
 #define PTE_TYPE_VALID		(1 << 0)
 
@@ -99,11 +105,9 @@
 #define TCR_TG0_16K		(2 << 14)
 #define TCR_EPD1_DISABLE	(1 << 23)
 
-#define TCR_EL1_RSVD		(1U << 31)
-#define TCR_EL2_RSVD		(1U << 31 | 1 << 23)
-#define TCR_EL3_RSVD		(1U << 31 | 1 << 23)
-
-#define HCR_EL2_E2H_BIT		34
+#define TCR_EL1_RSVD		(1 << 31)
+#define TCR_EL2_RSVD		(1 << 31 | 1 << 23)
+#define TCR_EL3_RSVD		(1 << 31 | 1 << 23)
 
 #ifndef __ASSEMBLY__
 static inline void set_ttbr_tcr_mair(int el, u64 table, u64 tcr, u64 attr)
@@ -136,7 +140,7 @@ struct mm_region {
 
 extern struct mm_region *mem_map;
 void setup_pgtables(void);
-u64 get_tcr(u64 *pips, u64 *pva_bits);
+u64 get_tcr(int el, u64 *pips, u64 *pva_bits);
 #endif
 
 #endif /* _ASM_ARMV8_MMU_H_ */

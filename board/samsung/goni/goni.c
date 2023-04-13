@@ -1,18 +1,15 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  *  Copyright (C) 2008-2009 Samsung Electronics
  *  Minkyu Kang <mk7.kang@samsung.com>
  *  Kyungmin Park <kyungmin.park@samsung.com>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <common.h>
-#include <init.h>
-#include <log.h>
-#include <asm/global_data.h>
 #include <asm/gpio.h>
 #include <asm/arch/mmc.h>
 #include <dm.h>
-#include <linux/delay.h>
 #include <power/pmic.h>
 #include <usb/dwc2_udc.h>
 #include <asm/arch/cpu.h>
@@ -24,6 +21,11 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
+u32 get_board_rev(void)
+{
+	return 0;
+}
+
 int board_init(void)
 {
 	/* Set Initial global variables */
@@ -32,6 +34,16 @@ int board_init(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_SYS_I2C_INIT_BOARD
+void i2c_init_board(void)
+{
+	gpio_request(S5PC110_GPIO_J43, "i2c_clk");
+	gpio_request(S5PC110_GPIO_J40, "i2c_data");
+	gpio_direction_output(S5PC110_GPIO_J43, 1);
+	gpio_direction_output(S5PC110_GPIO_J40, 1);
+}
+#endif
 
 int dram_init(void)
 {
@@ -62,7 +74,7 @@ int checkboard(void)
 #endif
 
 #ifdef CONFIG_MMC
-int board_mmc_init(struct bd_info *bis)
+int board_mmc_init(bd_t *bis)
 {
 	int i, ret, ret_sd = 0;
 
@@ -90,7 +102,7 @@ int board_mmc_init(struct bd_info *bis)
 
 	ret = s5p_mmc_init(0, 4);
 	if (ret)
-		pr_err("MMC: Failed to init MMC:0.\n");
+		error("MMC: Failed to init MMC:0.\n");
 
 	/*
 	 * SD card (T_FLASH) detect and init
@@ -115,7 +127,7 @@ int board_mmc_init(struct bd_info *bis)
 
 		ret_sd = s5p_mmc_init(2, 4);
 		if (ret_sd)
-			pr_err("MMC: Failed to init SD card (MMC:2).\n");
+			error("MMC: Failed to init SD card (MMC:2).\n");
 	}
 
 	return ret & ret_sd;

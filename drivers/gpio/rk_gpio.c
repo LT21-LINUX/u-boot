@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015 Google, Inc
  *
  * (C) Copyright 2008-2014 Rockchip Electronics
  * Peter, Software Engineering, <superpeter.cai@gmail.com>.
+ *
+ * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
@@ -12,8 +13,7 @@
 #include <linux/errno.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
-#include <asm/arch-rockchip/clock.h>
-#include <asm/arch-rockchip/gpio.h>
+#include <asm/arch/clock.h>
 #include <dm/pinctrl.h>
 #include <dt-bindings/clock/rk3288-cru.h>
 
@@ -86,87 +86,32 @@ static int rockchip_gpio_get_function(struct udevice *dev, unsigned offset)
 	ret = pinctrl_get_gpio_mux(priv->pinctrl, priv->bank, offset);
 	if (ret)
 		return ret;
+
+	/* If it's not 0, then it is not a GPIO */
+	if (ret)
+		return GPIOF_FUNC;
 	is_output = readl(&regs->swport_ddr) & OFFSET_TO_BIT(offset);
 
 	return is_output ? GPIOF_OUTPUT : GPIOF_INPUT;
 #endif
 }
 
-/* Simple SPL interface to GPIOs */
-#ifdef CONFIG_SPL_BUILD
-
-enum {
-	PULL_NONE_1V8 = 0,
-	PULL_DOWN_1V8 = 1,
-	PULL_UP_1V8 = 3,
-};
-
-int spl_gpio_set_pull(void *vregs, uint gpio, int pull)
-{
-	u32 *regs = vregs;
-	uint val;
-
-	regs += gpio >> GPIO_BANK_SHIFT;
-	gpio &= GPIO_OFFSET_MASK;
-	switch (pull) {
-	case GPIO_PULL_UP:
-		val = PULL_UP_1V8;
-		break;
-	case GPIO_PULL_DOWN:
-		val = PULL_DOWN_1V8;
-		break;
-	case GPIO_PULL_NORMAL:
-	default:
-		val = PULL_NONE_1V8;
-		break;
-	}
-	clrsetbits_le32(regs, 3 << (gpio * 2), val << (gpio * 2));
-
-	return 0;
-}
-
-int spl_gpio_output(void *vregs, uint gpio, int value)
-{
-	struct rockchip_gpio_regs * const regs = vregs;
-
-	clrsetbits_le32(&regs->swport_dr, 1 << gpio, value << gpio);
-
-	/* Set direction */
-	clrsetbits_le32(&regs->swport_ddr, 1 << gpio, 1 << gpio);
-
-	return 0;
-}
-#endif /* CONFIG_SPL_BUILD */
-
 static int rockchip_gpio_probe(struct udevice *dev)
 {
 	struct gpio_dev_priv *uc_priv = dev_get_uclass_priv(dev);
 	struct rockchip_gpio_priv *priv = dev_get_priv(dev);
-	struct ofnode_phandle_args args;
 	char *end;
 	int ret;
 
-	priv->regs = dev_read_addr_ptr(dev);
+	/* This only supports RK3288 at present */
+	priv->regs = (struct rockchip_gpio_regs *)devfdt_get_addr(dev);
 	ret = uclass_first_device_err(UCLASS_PINCTRL, &priv->pinctrl);
 	if (ret)
 		return ret;
 
-	/*
-	 * If "gpio-ranges" is present in the devicetree use it to parse
-	 * the GPIO bank ID, otherwise use the legacy method.
-	 */
-	ret = ofnode_parse_phandle_with_args(dev_ofnode(dev),
-					     "gpio-ranges", NULL, 3,
-					     0, &args);
-	if (!ret || ret != -ENOENT) {
-		uc_priv->gpio_count = args.args[2];
-		priv->bank = args.args[1] / args.args[2];
-	} else {
-		uc_priv->gpio_count = ROCKCHIP_GPIOS_PER_BANK;
-		end = strrchr(dev->name, '@');
-		priv->bank = trailing_strtoln(dev->name, end);
-	}
-
+	uc_priv->gpio_count = ROCKCHIP_GPIOS_PER_BANK;
+	end = strrchr(dev->name, '@');
+	priv->bank = trailing_strtoln(dev->name, end);
 	priv->name[0] = 'A' + priv->bank;
 	uc_priv->bank_name = priv->name;
 
@@ -186,11 +131,11 @@ static const struct udevice_id rockchip_gpio_ids[] = {
 	{ }
 };
 
-U_BOOT_DRIVER(rockchip_gpio_bank) = {
-	.name	= "rockchip_gpio_bank",
+U_BOOT_DRIVER(gpio_rockchip) = {
+	.name	= "gpio_rockchip",
 	.id	= UCLASS_GPIO,
 	.of_match = rockchip_gpio_ids,
 	.ops	= &gpio_rockchip_ops,
-	.priv_auto	= sizeof(struct rockchip_gpio_priv),
+	.priv_auto_alloc_size = sizeof(struct rockchip_gpio_priv),
 	.probe	= rockchip_gpio_probe,
 };

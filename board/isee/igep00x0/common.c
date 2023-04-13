@@ -1,15 +1,14 @@
-// SPDX-License-Identifier: GPL-2.0+
-
+/*
+ * SPDX-License-Identifier:	GPL-2.0+
+ */
 #include <common.h>
 #include <twl4030.h>
-#include <asm/global_data.h>
 #include <asm/io.h>
 #include <asm/omap_mmc.h>
 #include <asm/arch/mux.h>
 #include <asm/arch/sys_proto.h>
 #include <jffs2/load_kernel.h>
-#include <linux/delay.h>
-#include <linux/mtd/rawnand.h>
+#include <linux/mtd/nand.h>
 #include "igep00x0.h"
 
 DECLARE_GLOBAL_DATA_PTR;
@@ -57,7 +56,7 @@ int board_init(void)
 }
 
 #if defined(CONFIG_MMC)
-int board_mmc_init(struct bd_info *bis)
+int board_mmc_init(bd_t *bis)
 {
 	return omap_mmc_init(0, 0, 0, -1, -1);
 }

@@ -1,13 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2014-2015, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #define pr_fmt(fmt) "tegra-xusb-padctl: " fmt
 
 #include <common.h>
 #include <errno.h>
-#include <log.h>
 
 #include "xusb-padctl-common.h"
 
@@ -84,7 +84,7 @@ tegra_xusb_padctl_group_parse_dt(struct tegra_xusb_padctl *padctl,
 
 	len = ofnode_read_string_count(node, "nvidia,lanes");
 	if (len < 0) {
-		pr_err("failed to parse \"nvidia,lanes\" property\n");
+		error("failed to parse \"nvidia,lanes\" property");
 		return -EINVAL;
 	}
 
@@ -94,7 +94,7 @@ tegra_xusb_padctl_group_parse_dt(struct tegra_xusb_padctl *padctl,
 		ret = ofnode_read_string_index(node, "nvidia,lanes", i,
 					       &group->pins[i]);
 		if (ret) {
-			pr_err("failed to read string from \"nvidia,lanes\" property\n");
+			error("failed to read string from \"nvidia,lanes\" property");
 			return -EINVAL;
 		}
 	}
@@ -104,7 +104,7 @@ tegra_xusb_padctl_group_parse_dt(struct tegra_xusb_padctl *padctl,
 	ret = ofnode_read_string_index(node, "nvidia,function", 0,
 				       &group->func);
 	if (ret) {
-		pr_err("failed to parse \"nvidia,func\" property\n");
+		error("failed to parse \"nvidia,func\" property");
 		return -EINVAL;
 	}
 
@@ -157,14 +157,14 @@ tegra_xusb_padctl_group_apply(struct tegra_xusb_padctl *padctl,
 
 		lane = tegra_xusb_padctl_find_lane(padctl, group->pins[i]);
 		if (!lane) {
-			pr_err("no lane for pin %s", group->pins[i]);
+			error("no lane for pin %s", group->pins[i]);
 			continue;
 		}
 
 		func = tegra_xusb_padctl_lane_find_function(padctl, lane,
 							    group->func);
 		if (func < 0) {
-			pr_err("function %s invalid for lane %s: %d",
+			error("function %s invalid for lane %s: %d",
 			      group->func, lane->name, func);
 			continue;
 		}
@@ -206,7 +206,7 @@ tegra_xusb_padctl_config_apply(struct tegra_xusb_padctl *padctl,
 
 		err = tegra_xusb_padctl_group_apply(padctl, group);
 		if (err < 0) {
-			pr_err("failed to apply group %s: %d",
+			error("failed to apply group %s: %d",
 			      group->name, err);
 			continue;
 		}
@@ -224,7 +224,9 @@ tegra_xusb_padctl_config_parse_dt(struct tegra_xusb_padctl *padctl,
 
 	config->name = ofnode_get_name(node);
 
-	ofnode_for_each_subnode(subnode, node) {
+	for (subnode = ofnode_first_subnode(node);
+	     ofnode_valid(subnode);
+	     subnode = ofnode_next_subnode(subnode)) {
 		struct tegra_xusb_padctl_group *group;
 		int err;
 
@@ -232,7 +234,7 @@ tegra_xusb_padctl_config_parse_dt(struct tegra_xusb_padctl *padctl,
 
 		err = tegra_xusb_padctl_group_parse_dt(padctl, group, subnode);
 		if (err < 0) {
-			pr_err("failed to parse group %s\n", group->name);
+			error("failed to parse group %s", group->name);
 			return err;
 		}
 
@@ -250,18 +252,20 @@ static int tegra_xusb_padctl_parse_dt(struct tegra_xusb_padctl *padctl,
 
 	err = ofnode_read_resource(node, 0, &padctl->regs);
 	if (err < 0) {
-		pr_err("registers not found");
+		error("registers not found");
 		return err;
 	}
 
-	ofnode_for_each_subnode(subnode, node) {
+	for (subnode = ofnode_first_subnode(node);
+	     ofnode_valid(subnode);
+	     subnode = ofnode_next_subnode(subnode)) {
 		struct tegra_xusb_padctl_config *config = &padctl->config;
 
 		debug("%s: subnode=%s\n", __func__, ofnode_get_name(subnode));
 		err = tegra_xusb_padctl_config_parse_dt(padctl, config,
 							subnode);
 		if (err < 0) {
-			pr_err("failed to parse entry %s: %d\n",
+			error("failed to parse entry %s: %d",
 			      config->name, err);
 			continue;
 		}
@@ -282,14 +286,14 @@ int tegra_xusb_process_nodes(ofnode nodes[], unsigned int count,
 	debug("%s: count=%d\n", __func__, count);
 	for (i = 0; i < count; i++) {
 		debug("%s: i=%d, node=%p\n", __func__, i, nodes[i].np);
-		if (!ofnode_is_enabled(nodes[i]))
+		if (!ofnode_is_available(nodes[i]))
 			continue;
 
 		padctl.socdata = socdata;
 
 		err = tegra_xusb_padctl_parse_dt(&padctl, nodes[i]);
 		if (err < 0) {
-			pr_err("failed to parse DT: %d\n", err);
+			error("failed to parse DT: %d", err);
 			continue;
 		}
 
@@ -298,7 +302,7 @@ int tegra_xusb_process_nodes(ofnode nodes[], unsigned int count,
 
 		err = tegra_xusb_padctl_config_apply(&padctl, &padctl.config);
 		if (err < 0) {
-			pr_err("failed to apply pinmux: %d", err);
+			error("failed to apply pinmux: %d", err);
 			continue;
 		}
 

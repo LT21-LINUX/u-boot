@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2014
  * NVIDIA Corporation <www.nvidia.com>
+ *
+ * SPDX-License-Identifier:     GPL-2.0+
  */
 
 #include <common.h>
 #include <dm.h>
-#include <log.h>
 #include <power/as3722.h>
 #include <power/pmic.h>
 
@@ -14,6 +14,8 @@
 #include <asm/arch/pinmux.h>
 
 #include "pinmux-config-jetson-tk1.h"
+
+DECLARE_GLOBAL_DATA_PTR;
 
 /*
  * Routine: pinmux_init
@@ -47,7 +49,7 @@ static int as3722_sd_enable(struct udevice *pmic, unsigned int sd)
 
 	err = pmic_clrsetbits(pmic, AS3722_SD_CONTROL, 0, 1 << sd);
 	if (err) {
-		pr_err("failed to update SD control register: %d", err);
+		error("failed to update SD control register: %d", err);
 		return err;
 	}
 
@@ -60,7 +62,7 @@ int tegra_pcie_board_init(void)
 	int ret;
 
 	ret = uclass_get_device_by_driver(UCLASS_PMIC,
-					  DM_DRIVER_GET(pmic_as3722), &dev);
+					  DM_GET_DRIVER(pmic_as3722), &dev);
 	if (ret) {
 		debug("%s: Failed to find PMIC\n", __func__);
 		return ret;
@@ -68,13 +70,13 @@ int tegra_pcie_board_init(void)
 
 	ret = as3722_sd_enable(dev, 4);
 	if (ret < 0) {
-		pr_err("failed to enable SD4: %d\n", ret);
+		error("failed to enable SD4: %d\n", ret);
 		return ret;
 	}
 
 	ret = as3722_sd_set_voltage(dev, 4, 0x24);
 	if (ret < 0) {
-		pr_err("failed to set SD4 voltage: %d\n", ret);
+		error("failed to set SD4 voltage: %d\n", ret);
 		return ret;
 	}
 

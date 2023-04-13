@@ -54,7 +54,7 @@
 	};
 
 	chosen {
-		bootph-all;
+		u-boot,dm-pre-reloc;
 		stdout-path = &usart3;
 	};
 
@@ -75,32 +75,6 @@
 
 	ahb {
 		apb {
-			hlcdc: hlcdc@f0000000 {
-				atmel,vl-bpix = <4>;
-				atmel,output-mode = <18>;
-				atmel,guard-time = <1>;
-				pinctrl-names = "default";
-				pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_pwm &pinctrl_lcd_rgb666>;
-				status = "okay";
-				bootph-all;
-
-				display-timings {
-					bootph-all;
-					800x480 {
-						clock-frequency = <33260000>;
-						hactive = <800>;
-						vactive = <480>;
-						hsync-len = <5>;
-						hfront-porch = <128>;
-						hback-porch = <0>;
-						vfront-porch = <23>;
-						vback-porch = <22>;
-						vsync-len = <5>;
-						bootph-all;
-					};
-				};
-			};
-
 			adc0: adc@fc034000 {
 				pinctrl-names = "default";
 				pinctrl-0 = <
@@ -132,12 +106,12 @@
 			};
 
 			spi0: spi@f8010000 {
-				bootph-all;
+				u-boot,dm-pre-reloc;
 				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
 				status = "okay";
 				spi_flash@0 {
-					bootph-all;
-					compatible = "jedec,spi-nor";
+					u-boot,dm-pre-reloc;
+					compatible = "spi-flash";
 					spi-max-frequency = <50000000>;
 					reg = <0>;
 				};
@@ -186,7 +160,7 @@
 			};
 
 			mmc1: mmc@fc000000 {
-				bootph-all;
+				u-boot,dm-pre-reloc;
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
 				status = "okay";
@@ -202,7 +176,7 @@
 			};
 
 			usart3: serial@fc00c000 {
-				bootph-all;
+				u-boot,dm-pre-reloc;
 				status = "okay";
 			};
 
@@ -216,7 +190,7 @@
 
 			pinctrl@fc06a000 {
 				board {
-					bootph-all;
+					u-boot,dm-pre-reloc;
 					pinctrl_macb0_phy_irq: macb0_phy_irq {
 						atmel,pins =
 							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
@@ -226,7 +200,7 @@
 							<AT91_PIOE 5 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
 					};
 					pinctrl_mmc1_cd: mmc1_cd {
-						bootph-all;
+						u-boot,dm-pre-reloc;
 						atmel,pins =
 							<AT91_PIOE 6 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
 					};

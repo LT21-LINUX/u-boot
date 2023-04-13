@@ -1,26 +1,27 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2015 Google, Inc
  * Written by Simon Glass <sjg@chromium.org>
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
-
-#define LOG_CATEGORY UCLASS_USB_EMUL
 
 #include <common.h>
 #include <dm.h>
-#include <log.h>
 #include <usb.h>
 #include <dm/device-internal.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 static int copy_to_unicode(char *buff, int length, const char *str)
 {
 	int ptr;
+	int i;
 
 	if (length < 2)
 		return 0;
 	buff[1] = USB_DT_STRING;
-	for (ptr = 2; ptr + 1 < length && *str; str++, ptr += 2) {
-		buff[ptr] = *str;
+	for (ptr = 2, i = 0; ptr + 1 < length && *str; i++, ptr += 2) {
+		buff[ptr] = str[i];
 		buff[ptr + 1] = 0;
 	}
 	buff[0] = ptr;
@@ -51,7 +52,7 @@ static int usb_emul_get_string(struct usb_string *strings, int index,
 	return -EINVAL;
 }
 
-struct usb_generic_descriptor **usb_emul_find_descriptor(
+static struct usb_generic_descriptor **find_descriptor(
 		struct usb_generic_descriptor **ptr, int type, int index)
 {
 	debug("%s: type=%x, index=%d\n", __func__, type, index);
@@ -76,7 +77,7 @@ struct usb_generic_descriptor **usb_emul_find_descriptor(
 	return ptr;
 }
 
-static int usb_emul_get_descriptor(struct usb_dev_plat *plat, int value,
+static int usb_emul_get_descriptor(struct usb_dev_platdata *plat, int value,
 				   void *buffer, int length)
 {
 	struct usb_generic_descriptor **ptr;
@@ -90,7 +91,8 @@ static int usb_emul_get_descriptor(struct usb_dev_plat *plat, int value,
 					   length);
 	}
 
-	ptr = usb_emul_find_descriptor(plat->desc_list, type, index);
+	ptr = find_descriptor((struct usb_generic_descriptor **)plat->desc_list,
+			      type, index);
 	if (!ptr) {
 		debug("%s: Could not find descriptor type %d, index %d\n",
 		      __func__, type, index);
@@ -105,7 +107,7 @@ static int usb_emul_get_descriptor(struct usb_dev_plat *plat, int value,
 	return upto ? upto : length ? -EIO : 0;
 }
 
-static int usb_emul_find_devnum(int devnum, int port1, struct udevice **emulp)
+static int usb_emul_find_devnum(int devnum, struct udevice **emulp)
 {
 	struct udevice *dev;
 	struct uclass *uc;
@@ -116,39 +118,9 @@ static int usb_emul_find_devnum(int devnum, int port1, struct udevice **emulp)
 	if (ret)
 		return ret;
 	uclass_foreach_dev(dev, uc) {
-		struct usb_dev_plat *udev = dev_get_parent_plat(dev);
+		struct usb_dev_platdata *udev = dev_get_parent_platdata(dev);
 
-		/*
-		 * devnum is initialzied to zero at the beginning of the
-		 * enumeration process in usb_setup_device(). At this
-		 * point, udev->devnum has not been assigned to any valid
-		 * USB address either, so we can't rely on the comparison
-		 * result between udev->devnum and devnum to select an
-		 * emulator device.
-		 */
-		if (!devnum) {
-			struct usb_emul_plat *plat;
-
-			/*
-			 * If the parent is sandbox USB controller, we are
-			 * the root hub. And there is only one root hub
-			 * in the system.
-			 */
-			if (device_get_uclass_id(dev->parent) == UCLASS_USB) {
-				debug("%s: Found emulator '%s'\n",
-				      __func__, dev->name);
-				*emulp = dev;
-				return 0;
-			}
-
-			plat = dev_get_uclass_plat(dev);
-			if (plat->port1 == port1) {
-				debug("%s: Found emulator '%s', port %d\n",
-				      __func__, dev->name, port1);
-				*emulp = dev;
-				return 0;
-			}
-		} else if (udev->devnum == devnum) {
+		if (udev->devnum == devnum) {
 			debug("%s: Found emulator '%s', addr %d\n", __func__,
 			      dev->name, udev->devnum);
 			*emulp = dev;
@@ -160,19 +132,18 @@ static int usb_emul_find_devnum(int devnum, int port1, struct udevice **emulp)
 	return -ENOENT;
 }
 
-int usb_emul_find(struct udevice *bus, ulong pipe, int port1,
-		  struct udevice **emulp)
+int usb_emul_find(struct udevice *bus, ulong pipe, struct udevice **emulp)
 {
 	int devnum = usb_pipedevice(pipe);
 
-	return usb_emul_find_devnum(devnum, port1, emulp);
+	return usb_emul_find_devnum(devnum, emulp);
 }
 
 int usb_emul_find_for_dev(struct udevice *dev, struct udevice **emulp)
 {
-	struct usb_dev_plat *udev = dev_get_parent_plat(dev);
+	struct usb_dev_platdata *udev = dev_get_parent_platdata(dev);
 
-	return usb_emul_find_devnum(udev->devnum, 0, emulp);
+	return usb_emul_find_devnum(udev->devnum, emulp);
 }
 
 int usb_emul_control(struct udevice *emul, struct usb_device *udev,
@@ -180,11 +151,11 @@ int usb_emul_control(struct udevice *emul, struct usb_device *udev,
 		     struct devrequest *setup)
 {
 	struct dm_usb_ops *ops = usb_get_emul_ops(emul);
-	struct usb_dev_plat *plat;
+	struct usb_dev_platdata *plat;
 	int ret;
 
 	/* We permit getting the descriptor before we are probed */
-	plat = dev_get_parent_plat(emul);
+	plat = dev_get_parent_platdata(emul);
 	if (!ops->control)
 		return -ENOSYS;
 	debug("%s: dev=%s\n", __func__, emul->name);
@@ -247,8 +218,7 @@ int usb_emul_bulk(struct udevice *emul, struct usb_device *udev,
 }
 
 int usb_emul_int(struct udevice *emul, struct usb_device *udev,
-		  unsigned long pipe, void *buffer, int length, int interval,
-		  bool nonblock)
+		  unsigned long pipe, void *buffer, int length, int interval)
 {
 	struct dm_usb_ops *ops = usb_get_emul_ops(emul);
 
@@ -256,14 +226,13 @@ int usb_emul_int(struct udevice *emul, struct usb_device *udev,
 		return -ENOSYS;
 	debug("%s: dev=%s\n", __func__, emul->name);
 
-	return ops->interrupt(emul, udev, pipe, buffer, length, interval,
-			      nonblock);
+	return ops->interrupt(emul, udev, pipe, buffer, length, interval);
 }
 
-int usb_emul_setup_device(struct udevice *dev, struct usb_string *strings,
-			  void **desc_list)
+int usb_emul_setup_device(struct udevice *dev, int maxpacketsize,
+			  struct usb_string *strings, void **desc_list)
 {
-	struct usb_dev_plat *plat = dev_get_parent_plat(dev);
+	struct usb_dev_platdata *plat = dev_get_parent_platdata(dev);
 	struct usb_generic_descriptor **ptr;
 	struct usb_config_descriptor *cdesc;
 	int upto;
@@ -295,11 +264,18 @@ int usb_emul_setup_device(struct udevice *dev, struct usb_string *strings,
 	return 0;
 }
 
+void usb_emul_reset(struct udevice *dev)
+{
+	struct usb_dev_platdata *plat = dev_get_parent_platdata(dev);
+
+	plat->devnum = 0;
+	plat->configno = 0;
+}
+
 UCLASS_DRIVER(usb_emul) = {
 	.id		= UCLASS_USB_EMUL,
 	.name		= "usb_emul",
 	.post_bind	= dm_scan_fdt_dev,
-	.per_device_plat_auto	= sizeof(struct usb_emul_plat),
-	.per_child_auto	= sizeof(struct usb_device),
-	.per_child_plat_auto	= sizeof(struct usb_dev_plat),
+	.per_child_auto_alloc_size = sizeof(struct usb_device),
+	.per_child_platdata_auto_alloc_size = sizeof(struct usb_dev_platdata),
 };

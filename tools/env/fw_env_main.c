@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2000-2008
  * Wolfgang Denk, DENX Software Engineering, wd@denx.de.
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /*
@@ -26,7 +27,6 @@
  * of AES key), eg. '-a aabbccddeeff00112233445566778899'.
  */
 
-#include <env.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -34,7 +34,6 @@
 #include <stdlib.h>
 #include <sys/file.h>
 #include <unistd.h>
-#include <version.h>
 #include "fw_env_private.h"
 #include "fw_env.h"
 
@@ -43,12 +42,12 @@
 static int do_printenv;
 
 static struct option long_options[] = {
+	{"aes", required_argument, NULL, 'a'},
 	{"config", required_argument, NULL, 'c'},
 	{"help", no_argument, NULL, 'h'},
 	{"script", required_argument, NULL, 's'},
-	{"noheader", no_argument, NULL, 'n'},
+	{"noheader", required_argument, NULL, 'n'},
 	{"lock", required_argument, NULL, 'l'},
-	{"version", no_argument, NULL, 'v'},
 	{NULL, 0, NULL, 0}
 };
 
@@ -68,12 +67,14 @@ void usage_printenv(void)
 		"Print variables from U-Boot environment\n"
 		"\n"
 		" -h, --help           print this help.\n"
-		" -v, --version        display version\n"
+#ifdef CONFIG_ENV_AES
+		" -a, --aes            aes key to access environment\n"
+#endif
 #ifdef CONFIG_FILE
 		" -c, --config         configuration file, default:" CONFIG_FILE "\n"
 #endif
 		" -n, --noheader       do not repeat variable name in output\n"
-		" -l, --lock           lock node, default:/run\n"
+		" -l, --lock           lock node, default:/var/lock\n"
 		"\n");
 }
 
@@ -84,11 +85,13 @@ void usage_env_set(void)
 		"Modify variables in U-Boot environment\n"
 		"\n"
 		" -h, --help           print this help.\n"
-		" -v, --version        display version\n"
+#ifdef CONFIG_ENV_AES
+		" -a, --aes            aes key to access environment\n"
+#endif
 #ifdef CONFIG_FILE
 		" -c, --config         configuration file, default:" CONFIG_FILE "\n"
 #endif
-		" -l, --lock           lock node, default:/run\n"
+		" -l, --lock           lock node, default:/var/lock\n"
 		" -s, --script         batch mode to minimize writes\n"
 		"\n"
 		"Examples:\n"
@@ -120,9 +123,16 @@ static void parse_common_args(int argc, char *argv[])
 	env_opts.config_file = CONFIG_FILE;
 #endif
 
-	while ((c = getopt_long(argc, argv, ":a:c:l:h:v", long_options, NULL)) !=
+	while ((c = getopt_long(argc, argv, ":a:c:l:h", long_options, NULL)) !=
 	       EOF) {
 		switch (c) {
+		case 'a':
+			if (parse_aes_key(optarg, env_opts.aes_key)) {
+				fprintf(stderr, "AES key parse error\n");
+				exit(EXIT_FAILURE);
+			}
+			env_opts.aes_flag = 1;
+			break;
 #ifdef CONFIG_FILE
 		case 'c':
 			env_opts.config_file = optarg;
@@ -133,10 +143,6 @@ static void parse_common_args(int argc, char *argv[])
 			break;
 		case 'h':
 			do_printenv ? usage_printenv() : usage_env_set();
-			exit(EXIT_SUCCESS);
-			break;
-		case 'v':
-			fprintf(stderr, "Compiled with " U_BOOT_VERSION "\n");
 			exit(EXIT_SUCCESS);
 			break;
 		default:
@@ -156,7 +162,7 @@ int parse_printenv_args(int argc, char *argv[])
 
 	parse_common_args(argc, argv);
 
-	while ((c = getopt_long(argc, argv, "a:c:ns:l:h:v", long_options, NULL))
+	while ((c = getopt_long(argc, argv, "a:c:ns:l:h", long_options, NULL))
 		!= EOF) {
 		switch (c) {
 		case 'n':
@@ -183,7 +189,7 @@ int parse_setenv_args(int argc, char *argv[])
 
 	parse_common_args(argc, argv);
 
-	while ((c = getopt_long(argc, argv, "a:c:ns:l:h:v", long_options, NULL))
+	while ((c = getopt_long(argc, argv, "a:c:ns:l:h", long_options, NULL))
 		!= EOF) {
 		switch (c) {
 		case 's':
@@ -206,7 +212,7 @@ int parse_setenv_args(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	char *lockname = "/run/" CMD_PRINTENV ".lock";
+	char *lockname = "/var/lock/" CMD_PRINTENV ".lock";
 	int lockfd = -1;
 	int retval = EXIT_SUCCESS;
 	char *_cmdname;
@@ -239,7 +245,7 @@ int main(int argc, char *argv[])
 	argv += optind;
 
 	if (env_opts.lockname) {
-		lockname = malloc(strlen(env_opts.lockname) +
+		lockname = malloc(sizeof(env_opts.lockname) +
 				sizeof(CMD_PRINTENV) + 10);
 		if (!lockname) {
 			fprintf(stderr, "Unable allocate memory");

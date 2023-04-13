@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
  * Most of this source has been derived from the Linux USB
  * project:
@@ -14,6 +13,8 @@
  *
  * Adapted for U-Boot:
  * (C) Copyright 2001 Denis Peter, MPL AG Switzerland
+ *
+ * SPDX-License-Identifier:	GPL-2.0+
  */
 
 /****************************************************************************
@@ -24,15 +25,11 @@
 #include <common.h>
 #include <command.h>
 #include <dm.h>
-#include <env.h>
 #include <errno.h>
-#include <log.h>
-#include <malloc.h>
 #include <memalign.h>
 #include <asm/processor.h>
 #include <asm/unaligned.h>
 #include <linux/ctype.h>
-#include <linux/delay.h>
 #include <linux/list.h>
 #include <asm/byteorder.h>
 #ifdef CONFIG_SANDBOX
@@ -40,14 +37,14 @@
 #endif
 #include <asm/unaligned.h>
 
+DECLARE_GLOBAL_DATA_PTR;
+
 #include <usb.h>
 
 #define USB_BUFSIZ	512
 
 #define HUB_SHORT_RESET_TIME	20
 #define HUB_LONG_RESET_TIME	200
-
-#define HUB_DEBOUNCE_TIMEOUT	CONFIG_USB_HUB_DEBOUNCE_TIMEOUT
 
 #define PORT_OVERCURRENT_MAX_SCAN_COUNT		3
 
@@ -60,7 +57,7 @@ struct usb_device_scan {
 
 static LIST_HEAD(usb_scan_list);
 
-__weak void usb_hub_reset_devices(struct usb_hub_device *hub, int port)
+__weak void usb_hub_reset_devices(int port)
 {
 	return;
 }
@@ -70,7 +67,7 @@ static inline bool usb_hub_is_superspeed(struct usb_device *hdev)
 	return hdev->descriptor.bDeviceProtocol == 3;
 }
 
-#if CONFIG_IS_ENABLED(DM_USB)
+#ifdef CONFIG_DM_USB
 bool usb_hub_is_root_hub(struct udevice *hub)
 {
 	if (device_get_uclass_id(hub->parent) != UCLASS_USB_HUB)
@@ -131,7 +128,7 @@ int usb_get_port_status(struct usb_device *dev, int port, void *data)
 			USB_REQ_GET_STATUS, USB_DIR_IN | USB_RT_PORT, 0, port,
 			data, sizeof(struct usb_port_status), USB_CNTL_TIMEOUT);
 
-#if CONFIG_IS_ENABLED(DM_USB)
+#ifdef CONFIG_DM_USB
 	if (ret < 0)
 		return ret;
 
@@ -146,8 +143,7 @@ int usb_get_port_status(struct usb_device *dev, int port, void *data)
 
 	if (!usb_hub_is_root_hub(dev->dev) && usb_hub_is_superspeed(dev)) {
 		struct usb_port_status *status = (struct usb_port_status *)data;
-		u16 tmp = le16_to_cpu(status->wPortStatus) &
-			USB_SS_PORT_STAT_MASK;
+		u16 tmp = (status->wPortStatus) & USB_SS_PORT_STAT_MASK;
 
 		if (status->wPortStatus & USB_SS_PORT_STAT_POWER)
 			tmp |= USB_PORT_STAT_POWER;
@@ -155,7 +151,7 @@ int usb_get_port_status(struct usb_device *dev, int port, void *data)
 		    USB_SS_PORT_STAT_SPEED_5GBPS)
 			tmp |= USB_PORT_STAT_SUPER_SPEED;
 
-		status->wPortStatus = cpu_to_le16(tmp);
+		status->wPortStatus = tmp;
 	}
 #endif
 
@@ -168,7 +164,7 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 	int i;
 	struct usb_device *dev;
 	unsigned pgood_delay = hub->desc.bPwrOn2PwrGood * 2;
-	const char __maybe_unused *env;
+	const char *env;
 
 	dev = hub->pusb_dev;
 
@@ -193,12 +189,10 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 	 * but allow this time to be increased via env variable as some
 	 * devices break the spec and require longer warm-up times
 	 */
-#if CONFIG_IS_ENABLED(ENV_SUPPORT)
 	env = env_get("usb_pgood_delay");
 	if (env)
 		pgood_delay = max(pgood_delay,
 			          (unsigned)simple_strtol(env, NULL, 0));
-#endif
 	debug("pgood_delay=%dms\n", pgood_delay);
 
 	/*
@@ -212,13 +206,13 @@ static void usb_hub_power_on(struct usb_hub_device *hub)
 	 * will be done based on this value in the USB port loop in
 	 * usb_hub_configure() later.
 	 */
-	hub->connect_timeout = hub->query_delay + HUB_DEBOUNCE_TIMEOUT;
+	hub->connect_timeout = hub->query_delay + 1000;
 	debug("devnum=%d poweron: query_delay=%d connect_timeout=%d\n",
 	      dev->devnum, max(100, (int)pgood_delay),
-	      max(100, (int)pgood_delay) + HUB_DEBOUNCE_TIMEOUT);
+	      max(100, (int)pgood_delay) + 1000);
 }
 
-#if !CONFIG_IS_ENABLED(DM_USB)
+#ifndef CONFIG_DM_USB
 static struct usb_hub_device hub_dev[USB_MAX_HUB];
 static int usb_hub_index;
 
@@ -242,18 +236,26 @@ static struct usb_hub_device *usb_hub_allocate(void)
 
 #define MAX_TRIES 5
 
-static inline const char *portspeed(int portstatus)
+static inline char *portspeed(int portstatus)
 {
+	char *speed_str;
+
 	switch (portstatus & USB_PORT_STAT_SPEED_MASK) {
 	case USB_PORT_STAT_SUPER_SPEED:
-		return "5 Gb/s";
+		speed_str = "5 Gb/s";
+		break;
 	case USB_PORT_STAT_HIGH_SPEED:
-		return "480 Mb/s";
+		speed_str = "480 Mb/s";
+		break;
 	case USB_PORT_STAT_LOW_SPEED:
-		return "1.5 Mb/s";
+		speed_str = "1.5 Mb/s";
+		break;
 	default:
-		return "12 Mb/s";
+		speed_str = "12 Mb/s";
+		break;
 	}
+
+	return speed_str;
 }
 
 /**
@@ -274,7 +276,7 @@ static int usb_hub_port_reset(struct usb_device *dev, int port,
 	unsigned short portstatus, portchange;
 	int delay = HUB_SHORT_RESET_TIME; /* start with short reset delay */
 
-#if CONFIG_IS_ENABLED(DM_USB)
+#ifdef CONFIG_DM_USB
 	debug("%s: resetting '%s' port %d...\n", __func__, dev->dev->name,
 	      port + 1);
 #else
@@ -395,7 +397,7 @@ int usb_hub_port_connect_change(struct usb_device *dev, int port)
 		break;
 	}
 
-#if CONFIG_IS_ENABLED(DM_USB)
+#ifdef CONFIG_DM_USB
 	struct udevice *child;
 
 	ret = usb_scan_device(dev->dev, port + 1, speed, &child);
@@ -487,17 +489,6 @@ static int usb_scan_port(struct usb_device_scan *usb_scan)
 		return 0;
 	}
 
-	if (portchange & USB_PORT_STAT_C_RESET) {
-		debug("port %d reset change\n", i + 1);
-		usb_clear_port_feature(dev, i + 1, USB_PORT_FEAT_C_RESET);
-	}
-
-	if ((portchange & USB_SS_PORT_STAT_C_BH_RESET) &&
-	    usb_hub_is_superspeed(dev)) {
-		debug("port %d BH reset change\n", i + 1);
-		usb_clear_port_feature(dev, i + 1, USB_SS_PORT_FEAT_C_BH_RESET);
-	}
-
 	/* A new USB device is ready at this point */
 	debug("devnum=%d port=%d: USB dev found\n", dev->devnum, i + 1);
 
@@ -506,6 +497,11 @@ static int usb_scan_port(struct usb_device_scan *usb_scan)
 	if (portchange & USB_PORT_STAT_C_ENABLE) {
 		debug("port %d enable change, status %x\n", i + 1, portstatus);
 		usb_clear_port_feature(dev, i + 1, USB_PORT_FEAT_C_ENABLE);
+		/*
+		 * The following hack causes a ghost device problem
+		 * to Faraday EHCI
+		 */
+#ifndef CONFIG_USB_EHCI_FARADAY
 		/*
 		 * EM interference sometimes causes bad shielded USB
 		 * devices to be shutdown by the hub, this hack enables
@@ -518,6 +514,7 @@ static int usb_scan_port(struct usb_device_scan *usb_scan)
 			      i + 1);
 			usb_hub_port_connect_change(dev, i);
 		}
+#endif
 	}
 
 	if (portstatus & USB_PORT_STAT_SUSPEND) {
@@ -544,6 +541,11 @@ static int usb_scan_port(struct usb_device_scan *usb_scan)
 		/* Otherwise the device will get removed */
 		printf("Port %d over-current occurred %d times\n", i + 1,
 		       hub->overcurrent_count[i]);
+	}
+
+	if (portchange & USB_PORT_STAT_C_RESET) {
+		debug("port %d reset change\n", i + 1);
+		usb_clear_port_feature(dev, i + 1, USB_PORT_FEAT_C_RESET);
 	}
 
 	/*
@@ -599,7 +601,7 @@ static struct usb_hub_device *usb_get_hub_device(struct usb_device *dev)
 {
 	struct usb_hub_device *hub;
 
-#if !CONFIG_IS_ENABLED(DM_USB)
+#ifndef CONFIG_DM_USB
 	/* "allocate" Hub device */
 	hub = usb_hub_allocate();
 #else
@@ -617,7 +619,7 @@ static int usb_hub_configure(struct usb_device *dev)
 	short hubCharacteristics;
 	struct usb_hub_descriptor *descriptor;
 	struct usb_hub_device *hub;
-	struct usb_hub_status *hubsts;
+	__maybe_unused struct usb_hub_status *hubsts;
 	int ret;
 
 	hub = usb_get_hub_device(dev);
@@ -771,7 +773,9 @@ static int usb_hub_configure(struct usb_device *dev)
 		return ret;
 	}
 
+#ifdef DEBUG
 	hubsts = (struct usb_hub_status *)buffer;
+#endif
 
 	debug("get_hub_status returned status %X, change %X\n",
 	      le16_to_cpu(hubsts->wHubStatus),
@@ -783,7 +787,7 @@ static int usb_hub_configure(struct usb_device *dev)
 	      (le16_to_cpu(hubsts->wHubStatus) & HUB_STATUS_OVERCURRENT) ? \
 	      "" : "no ");
 
-#if CONFIG_IS_ENABLED(DM_USB)
+#ifdef CONFIG_DM_USB
 	/*
 	 * Update USB host controller's internal representation of this hub
 	 * after the hub descriptor is fetched.
@@ -843,7 +847,7 @@ static int usb_hub_configure(struct usb_device *dev)
 	 * should occur in the board file of the device.
 	 */
 	for (i = 0; i < dev->maxchild; i++)
-		usb_hub_reset_devices(hub, i + 1);
+		usb_hub_reset_devices(i + 1);
 
 	/*
 	 * Only add the connected USB devices, including potential hubs,
@@ -925,7 +929,7 @@ int usb_hub_probe(struct usb_device *dev, int ifnum)
 	return ret;
 }
 
-#if CONFIG_IS_ENABLED(DM_USB)
+#ifdef CONFIG_DM_USB
 int usb_hub_scan(struct udevice *hub)
 {
 	struct usb_device *udev = dev_get_parent_priv(hub);
@@ -957,9 +961,9 @@ UCLASS_DRIVER(usb_hub) = {
 	.post_bind	= dm_scan_fdt_dev,
 	.post_probe	= usb_hub_post_probe,
 	.child_pre_probe	= usb_child_pre_probe,
-	.per_child_auto	= sizeof(struct usb_device),
-	.per_child_plat_auto	= sizeof(struct usb_dev_plat),
-	.per_device_auto	= sizeof(struct usb_hub_device),
+	.per_child_auto_alloc_size = sizeof(struct usb_device),
+	.per_child_platdata_auto_alloc_size = sizeof(struct usb_dev_platdata),
+	.per_device_auto_alloc_size = sizeof(struct usb_hub_device),
 };
 
 static const struct usb_device_id hub_id_table[] = {
