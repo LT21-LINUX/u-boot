@@ -14,6 +14,16 @@ config DM_GPIO
 	  particular GPIOs that they provide. The uclass interface
 	  is defined in include/asm-generic/gpio.h.
 
+config GPIO_HOG
+	bool "Enable GPIO hog support"
+	depends on DM_GPIO
+	default n
+	help
+	  Enable gpio hog support
+	  The GPIO chip may contain GPIO hog definitions. GPIO hogging
+	  is a mechanism providing automatic GPIO request and config-
+	  uration as part of the gpio-controller's driver probe function.
+
 config ALTERA_PIO
 	bool "Altera PIO driver"
 	depends on DM_GPIO
@@ -143,6 +153,19 @@ config ROCKCHIP_GPIO
 	  a number of banks (different for each SoC type) each with 32 GPIOs.
 	  The GPIOs for a device are defined in the device tree with one node
 	  for each bank.
+
+config ROCKCHIP_GPIO_V2
+	bool "Rockchip GPIO driver version 2.0"
+	depends on ROCKCHIP_GPIO
+	default n
+	help
+	  Support GPIO access on Rockchip SoCs. The GPIOs are arranged into
+	  a number of banks (different for each SoC type) each with 32 GPIOs.
+	  The GPIOs for a device are defined in the device tree with one node
+	  for each bank.
+
+	  Support version 2.0 GPIO controller, which support write enable bits
+	  for some registers, such as dr, ddr.
 
 config SANDBOX_GPIO
 	bool "Enable sandbox GPIO driver"
