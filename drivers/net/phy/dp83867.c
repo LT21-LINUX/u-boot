@@ -144,6 +144,7 @@ static int dp83867_config_port_mirroring(struct phy_device *phydev)
 	return 0;
 }
 
+#if defined(CONFIG_DM_ETH)
 /**
  * dp83867_data_init - Convenience function for setting PHY specific data
  *
@@ -248,6 +249,19 @@ static int dp83867_of_init(struct phy_device *phydev)
 
 	return 0;
 }
+#else
+static int dp83867_of_init(struct phy_device *phydev)
+{
+	struct dp83867_private *dp83867 = phydev->priv;
+
+	dp83867->rx_id_delay = DP83867_RGMIIDCTL_2_25_NS;
+	dp83867->tx_id_delay = DP83867_RGMIIDCTL_2_75_NS;
+	dp83867->fifo_depth = DEFAULT_FIFO_DEPTH;
+	dp83867->io_impedance = -EINVAL;
+
+	return 0;
+}
+#endif
 
 static int dp83867_config(struct phy_device *phydev)
 {
@@ -409,7 +423,7 @@ static int dp83867_probe(struct phy_device *phydev)
 	return 0;
 }
 
-U_BOOT_PHY_DRIVER(dp83867) = {
+static struct phy_driver DP83867_driver = {
 	.name = "TI DP83867",
 	.uid = 0x2000a231,
 	.mask = 0xfffffff0,
@@ -419,3 +433,9 @@ U_BOOT_PHY_DRIVER(dp83867) = {
 	.startup = &genphy_startup,
 	.shutdown = &genphy_shutdown,
 };
+
+int phy_dp83867_init(void)
+{
+	phy_register(&DP83867_driver);
+	return 0;
+}

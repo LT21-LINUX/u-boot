@@ -409,7 +409,7 @@ static int rtl8211f_startup(struct phy_device *phydev)
 }
 
 /* Support for RTL8211B PHY */
-U_BOOT_PHY_DRIVER(rtl8211b) = {
+static struct phy_driver RTL8211B_driver = {
 	.name = "RealTek RTL8211B",
 	.uid = 0x1cc912,
 	.mask = 0xffffff,
@@ -421,7 +421,7 @@ U_BOOT_PHY_DRIVER(rtl8211b) = {
 };
 
 /* Support for RTL8211E-VB-CG, RTL8211E-VL-CG and RTL8211EG-VB-CG PHYs */
-U_BOOT_PHY_DRIVER(rtl8211e) = {
+static struct phy_driver RTL8211E_driver = {
 	.name = "RealTek RTL8211E",
 	.uid = 0x1cc915,
 	.mask = 0xffffff,
@@ -433,7 +433,7 @@ U_BOOT_PHY_DRIVER(rtl8211e) = {
 };
 
 /* Support for RTL8211DN PHY */
-U_BOOT_PHY_DRIVER(rtl8211dn) = {
+static struct phy_driver RTL8211DN_driver = {
 	.name = "RealTek RTL8211DN",
 	.uid = 0x1cc914,
 	.mask = 0xffffff,
@@ -444,7 +444,7 @@ U_BOOT_PHY_DRIVER(rtl8211dn) = {
 };
 
 /* Support for RTL8211F PHY */
-U_BOOT_PHY_DRIVER(rtl8211f) = {
+static struct phy_driver RTL8211F_driver = {
 	.name = "RealTek RTL8211F",
 	.uid = 0x1cc916,
 	.mask = 0xffffff,
@@ -458,7 +458,7 @@ U_BOOT_PHY_DRIVER(rtl8211f) = {
 };
 
 /* Support for RTL8201F PHY */
-U_BOOT_PHY_DRIVER(rtl8201f) = {
+static struct phy_driver RTL8201F_driver = {
 	.name = "RealTek RTL8201F 10/100Mbps Ethernet",
 	.uid = 0x1cc816,
 	.mask = 0xffffff,
@@ -468,3 +468,14 @@ U_BOOT_PHY_DRIVER(rtl8201f) = {
 	.startup = &rtl8211e_startup,
 	.shutdown = &genphy_shutdown,
 };
+
+int phy_realtek_init(void)
+{
+	phy_register(&RTL8211B_driver);
+	phy_register(&RTL8211E_driver);
+	phy_register(&RTL8211F_driver);
+	phy_register(&RTL8211DN_driver);
+	phy_register(&RTL8201F_driver);
+
+	return 0;
+}

@@ -23,8 +23,8 @@
 #include <net.h>
 #include <pxe_utils.h>
 
-static int distro_pxe_getfile(struct pxe_context *ctx, const char *file_path,
-			      char *file_addr, ulong *sizep)
+static int disto_pxe_getfile(struct pxe_context *ctx, const char *file_path,
+			     char *file_addr, ulong *sizep)
 {
 	struct distro_info *info = ctx->userdata;
 	ulong addr;
@@ -44,12 +44,9 @@ static int distro_pxe_check(struct udevice *dev, struct bootflow_iter *iter)
 	int ret;
 
 	/* This only works on network devices */
-	ret = bootflow_iter_check_net(iter);
+	ret = bootflow_iter_uses_network(iter);
 	if (ret)
 		return log_msg_ret("net", ret);
-
-	if (iter->method_flags & BOOTFLOW_METHF_DHCP_ONLY)
-		return log_msg_ret("dhcp", -ENOTSUPP);
 
 	return 0;
 }
@@ -145,7 +142,7 @@ static int distro_pxe_boot(struct udevice *dev, struct bootflow *bflow)
 	info.dev = dev;
 	info.bflow = bflow;
 	info.cmdtp = &cmdtp;
-	ret = pxe_setup_ctx(ctx, &cmdtp, distro_pxe_getfile, &info, false,
+	ret = pxe_setup_ctx(ctx, &cmdtp, disto_pxe_getfile, &info, false,
 			    bflow->subdir);
 	if (ret)
 		return log_msg_ret("ctx", -EINVAL);

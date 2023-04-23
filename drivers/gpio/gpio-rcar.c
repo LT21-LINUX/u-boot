@@ -133,7 +133,7 @@ static int rcar_gpio_get_function(struct udevice *dev, unsigned offset)
 static int rcar_gpio_request(struct udevice *dev, unsigned offset,
 			     const char *label)
 {
-	return pinctrl_gpio_request(dev, offset, label);
+	return pinctrl_gpio_request(dev, offset);
 }
 
 static int rcar_gpio_free(struct udevice *dev, unsigned offset)
@@ -195,7 +195,6 @@ static const struct udevice_id rcar_gpio_ids[] = {
 	{ .compatible = "renesas,gpio-r8a779a0", .data = RCAR_GPIO_HAS_INEN },
 	{ .compatible = "renesas,rcar-gen2-gpio" },
 	{ .compatible = "renesas,rcar-gen3-gpio" },
-	{ .compatible = "renesas,rcar-gen4-gpio", .data = RCAR_GPIO_HAS_INEN },
 	{ /* sentinel */ }
 };
 

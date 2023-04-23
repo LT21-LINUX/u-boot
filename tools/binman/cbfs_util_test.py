@@ -19,9 +19,10 @@ import unittest
 from binman import bintool
 from binman import cbfs_util
 from binman.cbfs_util import CbfsWriter
+from binman import comp_util
 from binman import elf
-from u_boot_pylib import test_util
-from u_boot_pylib import tools
+from patman import test_util
+from patman import tools
 
 U_BOOT_DATA           = b'1234'
 U_BOOT_DTB_DATA       = b'udtb'
@@ -49,8 +50,7 @@ class TestCbfs(unittest.TestCase):
         cls.cbfstool = bintool.Bintool.create('cbfstool')
         cls.have_cbfstool = cls.cbfstool.is_present()
 
-        lz4 = bintool.Bintool.create('lz4')
-        cls.have_lz4 = lz4.is_present()
+        cls.have_lz4 = comp_util.HAVE_LZ4
 
     @classmethod
     def tearDownClass(cls):

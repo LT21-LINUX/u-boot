@@ -38,12 +38,12 @@
 };
 
 &qspi {
-	bootph-all;
+	u-boot,dm-pre-reloc;
 	status = "okay";
 };
 
 &uart1 {
-	bootph-all;
+	u-boot,dm-pre-reloc;
 	status = "okay";
 };
 
@@ -58,7 +58,7 @@
 };
 
 &sdhci0 {
-	bootph-all;
+	u-boot,dm-pre-reloc;
 	status = "okay";
 };
 

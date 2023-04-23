@@ -33,6 +33,11 @@
 #include <bootm.h>
 #include <image.h>
 
+#ifndef CONFIG_SYS_BOOTM_LEN
+/* use 8MByte as default max gunzip size */
+#define CONFIG_SYS_BOOTM_LEN	0x800000
+#endif
+
 #define MAX_CMDLINE_SIZE	SZ_4K
 
 #define IH_INITRD_ARCH IH_ARCH_DEFAULT
@@ -41,10 +46,10 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-struct bootm_headers images;		/* pointers to os/initrd/fdt images */
+bootm_headers_t images;		/* pointers to os/initrd/fdt images */
 
 static const void *boot_get_kernel(struct cmd_tbl *cmdtp, int flag, int argc,
-				   char *const argv[], struct bootm_headers *images,
+				   char *const argv[], bootm_headers_t *images,
 				   ulong *os_data, ulong *os_len);
 
 __weak void board_quiesce_devices(void)
@@ -52,7 +57,7 @@ __weak void board_quiesce_devices(void)
 }
 
 #ifdef CONFIG_LMB
-static void boot_start_lmb(struct bootm_headers *images)
+static void boot_start_lmb(bootm_headers_t *images)
 {
 	ulong		mem_start;
 	phys_size_t	mem_size;
@@ -65,7 +70,7 @@ static void boot_start_lmb(struct bootm_headers *images)
 }
 #else
 #define lmb_reserve(lmb, base, size)
-static inline void boot_start_lmb(struct bootm_headers *images) { }
+static inline void boot_start_lmb(bootm_headers_t *images) { }
 #endif
 
 static int bootm_start(struct cmd_tbl *cmdtp, int flag, int argc,
@@ -100,7 +105,7 @@ static int bootm_pre_load(struct cmd_tbl *cmdtp, int flag, int argc,
 	ulong data_addr = bootm_data_addr(argc, argv);
 	int ret = 0;
 
-	if (IS_ENABLED(CONFIG_CMD_BOOTM_PRE_LOAD))
+	if (CONFIG_IS_ENABLED(CMD_BOOTM_PRE_LOAD))
 		ret = image_pre_load(data_addr);
 
 	if (ret)
@@ -113,10 +118,6 @@ static int bootm_find_os(struct cmd_tbl *cmdtp, int flag, int argc,
 			 char *const argv[])
 {
 	const void *os_hdr;
-#ifdef CONFIG_ANDROID_BOOT_IMAGE
-	const void *vendor_boot_img;
-	const void *boot_img;
-#endif
 	bool ep_found = false;
 	int ret;
 
@@ -185,23 +186,14 @@ static int bootm_find_os(struct cmd_tbl *cmdtp, int flag, int argc,
 #endif
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
-		boot_img = os_hdr;
-		vendor_boot_img = NULL;
-		if (IS_ENABLED(CONFIG_CMD_ABOOTIMG)) {
-			boot_img = map_sysmem(get_abootimg_addr(), 0);
-			vendor_boot_img = map_sysmem(get_avendor_bootimg_addr(), 0);
-		}
 		images.os.type = IH_TYPE_KERNEL;
-		images.os.comp = android_image_get_kcomp(boot_img, vendor_boot_img);
+		images.os.comp = android_image_get_kcomp(os_hdr);
 		images.os.os = IH_OS_LINUX;
-		images.os.end = android_image_get_end(boot_img, vendor_boot_img);
-		images.os.load = android_image_get_kload(boot_img, vendor_boot_img);
+
+		images.os.end = android_image_get_end(os_hdr);
+		images.os.load = android_image_get_kload(os_hdr);
 		images.ep = images.os.load;
 		ep_found = true;
-		if (IS_ENABLED(CONFIG_CMD_ABOOTIMG)) {
-			unmap_sysmem(vendor_boot_img);
-			unmap_sysmem(boot_img);
-		}
 		break;
 #endif
 	default:
@@ -239,7 +231,7 @@ static int bootm_find_os(struct cmd_tbl *cmdtp, int flag, int argc,
 	}
 
 	if (images.os.type == IH_TYPE_KERNEL_NOLOAD) {
-		if (IS_ENABLED(CONFIG_CMD_BOOTI) &&
+		if (CONFIG_IS_ENABLED(CMD_BOOTI) &&
 		    images.os.arch == IH_ARCH_ARM64) {
 			ulong image_addr;
 			ulong image_size;
@@ -318,15 +310,15 @@ int bootm_find_images(int flag, int argc, char *const argv[], ulong start,
 	/* check if FDT overlaps OS image */
 	if (images.ft_addr &&
 	    (((ulong)images.ft_addr >= start &&
-	      (ulong)images.ft_addr < start + size) ||
+	      (ulong)images.ft_addr <= start + size) ||
 	     ((ulong)images.ft_addr + images.ft_len >= start &&
-	      (ulong)images.ft_addr + images.ft_len < start + size))) {
+	      (ulong)images.ft_addr + images.ft_len <= start + size))) {
 		printf("ERROR: FDT image overlaps OS image (OS=0x%lx..0x%lx)\n",
 		       start, start + size);
 		return 1;
 	}
 
-	if (IS_ENABLED(CONFIG_CMD_FDT))
+	if (CONFIG_IS_ENABLED(CMD_FDT))
 		set_working_fdt_addr(map_to_sysmem(images.ft_addr));
 #endif
 
@@ -377,12 +369,10 @@ static int bootm_find_other(struct cmd_tbl *cmdtp, int flag, int argc,
  *
  * @comp_type:		Compression type being used (IH_COMP_...)
  * @uncomp_size:	Number of bytes uncompressed
- * @buf_size:		Number of bytes the decompresion buffer was
  * @ret:		errno error code received from compression library
  * Return: Appropriate BOOTM_ERR_ error code
  */
-static int handle_decomp_error(int comp_type, size_t uncomp_size,
-			       size_t buf_size, int ret)
+static int handle_decomp_error(int comp_type, size_t uncomp_size, int ret)
 {
 	const char *name = genimg_get_comp_name(comp_type);
 
@@ -390,7 +380,7 @@ static int handle_decomp_error(int comp_type, size_t uncomp_size,
 	if (ret == -ENOSYS)
 		return BOOTM_ERR_UNIMPLEMENTED;
 
-	if (uncomp_size >= buf_size)
+	if (uncomp_size >= CONFIG_SYS_BOOTM_LEN)
 		printf("Image too large: increase CONFIG_SYS_BOOTM_LEN\n");
 	else
 		printf("%s: uncompress error %d\n", name, ret);
@@ -410,9 +400,9 @@ static int handle_decomp_error(int comp_type, size_t uncomp_size,
 #endif
 
 #ifndef USE_HOSTCC
-static int bootm_load_os(struct bootm_headers *images, int boot_progress)
+static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 {
-	struct image_info os = images->os;
+	image_info_t os = images->os;
 	ulong load = os.load;
 	ulong load_end;
 	ulong blob_start = os.start;
@@ -430,8 +420,7 @@ static int bootm_load_os(struct bootm_headers *images, int boot_progress)
 			   load_buf, image_buf, image_len,
 			   CONFIG_SYS_BOOTM_LEN, &load_end);
 	if (err) {
-		err = handle_decomp_error(os.comp, load_end - load,
-					  CONFIG_SYS_BOOTM_LEN, err);
+		err = handle_decomp_error(os.comp, load_end - load, err);
 		bootstage_error(BOOTSTAGE_ID_DECOMP_IMAGE);
 		return err;
 	}
@@ -488,6 +477,9 @@ ulong bootm_disable_interrupts(void)
 #ifdef CONFIG_NETCONSOLE
 	/* Stop the ethernet stack if NetConsole could have left it up */
 	eth_halt();
+# ifndef CONFIG_DM_ETH
+	eth_unregister(eth_get_dev());
+# endif
 #endif
 
 #if defined(CONFIG_CMD_USB)
@@ -506,8 +498,7 @@ ulong bootm_disable_interrupts(void)
 }
 
 #define CONSOLE_ARG		"console="
-#define NULL_CONSOLE		(CONSOLE_ARG "ttynull")
-#define CONSOLE_ARG_SIZE	sizeof(NULL_CONSOLE)
+#define CONSOLE_ARG_SIZE	sizeof(CONSOLE_ARG)
 
 /**
  * fixup_silent_linux() - Handle silencing the linux boot if required
@@ -559,22 +550,21 @@ static int fixup_silent_linux(char *buf, int maxlen)
 			char *end = strchr(start, ' ');
 			int start_bytes;
 
-			start_bytes = start - cmdline;
+			start_bytes = start - cmdline + CONSOLE_ARG_SIZE - 1;
 			strncpy(buf, cmdline, start_bytes);
-			strncpy(buf + start_bytes, NULL_CONSOLE, CONSOLE_ARG_SIZE);
 			if (end)
-				strcpy(buf + start_bytes + CONSOLE_ARG_SIZE - 1, end);
+				strcpy(buf + start_bytes, end);
 			else
-				buf[start_bytes + CONSOLE_ARG_SIZE] = '\0';
+				buf[start_bytes] = '\0';
 		} else {
-			sprintf(buf, "%s %s", cmdline, NULL_CONSOLE);
+			sprintf(buf, "%s %s", cmdline, CONSOLE_ARG);
 		}
 		if (buf + strlen(buf) >= cmdline)
 			return -ENOSPC;
 	} else {
-		if (maxlen < CONSOLE_ARG_SIZE)
+		if (maxlen < sizeof(CONSOLE_ARG))
 			return -ENOSPC;
-		strcpy(buf, NULL_CONSOLE);
+		strcpy(buf, CONSOLE_ARG);
 	}
 	debug("after silent fix-up: %s\n", buf);
 
@@ -698,7 +688,7 @@ int bootm_process_cmdline_env(int flags)
  *	unless the image type is standalone.
  */
 int do_bootm_states(struct cmd_tbl *cmdtp, int flag, int argc,
-		    char *const argv[], int states, struct bootm_headers *images,
+		    char *const argv[], int states, bootm_headers_t *images,
 		    int boot_progress)
 {
 	boot_os_fn *boot_fn;
@@ -800,7 +790,7 @@ int do_bootm_states(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	/* Check for unsupported subcommand. */
 	if (ret) {
-		printf("subcommand failed (err=%d)\n", ret);
+		puts("subcommand not supported\n");
 		return ret;
 	}
 
@@ -835,9 +825,9 @@ err:
  *     pointer to a legacy image header if valid image was found
  *     otherwise return NULL
  */
-static struct legacy_img_hdr *image_get_kernel(ulong img_addr, int verify)
+static image_header_t *image_get_kernel(ulong img_addr, int verify)
 {
-	struct legacy_img_hdr *hdr = (struct legacy_img_hdr *)img_addr;
+	image_header_t *hdr = (image_header_t *)img_addr;
 
 	if (!image_check_magic(hdr)) {
 		puts("Bad Magic Number\n");
@@ -888,11 +878,11 @@ static struct legacy_img_hdr *image_get_kernel(ulong img_addr, int verify)
  *     address and length, otherwise NULL
  */
 static const void *boot_get_kernel(struct cmd_tbl *cmdtp, int flag, int argc,
-				   char *const argv[], struct bootm_headers *images,
+				   char *const argv[], bootm_headers_t *images,
 				   ulong *os_data, ulong *os_len)
 {
 #if CONFIG_IS_ENABLED(LEGACY_IMAGE_FORMAT)
-	struct legacy_img_hdr	*hdr;
+	image_header_t	*hdr;
 #endif
 	ulong		img_addr;
 	const void *buf;
@@ -902,15 +892,11 @@ static const void *boot_get_kernel(struct cmd_tbl *cmdtp, int flag, int argc,
 	int		os_noffset;
 #endif
 
-#ifdef CONFIG_ANDROID_BOOT_IMAGE
-	const void *boot_img;
-	const void *vendor_boot_img;
-#endif
 	img_addr = genimg_get_kernel_addr_fit(argc < 1 ? NULL : argv[0],
 					      &fit_uname_config,
 					      &fit_uname_kernel);
 
-	if (IS_ENABLED(CONFIG_CMD_BOOTM_PRE_LOAD))
+	if (CONFIG_IS_ENABLED(CMD_BOOTM_PRE_LOAD))
 		img_addr += image_load_offset;
 
 	bootstage_mark(BOOTSTAGE_ID_CHECK_MAGIC);
@@ -954,7 +940,7 @@ static const void *boot_get_kernel(struct cmd_tbl *cmdtp, int flag, int argc,
 		 * kernel decompression.
 		 */
 		memmove(&images->legacy_hdr_os_copy, hdr,
-			sizeof(struct legacy_img_hdr));
+			sizeof(image_header_t));
 
 		/* save pointer to image header */
 		images->legacy_hdr_os = hdr;
@@ -981,20 +967,10 @@ static const void *boot_get_kernel(struct cmd_tbl *cmdtp, int flag, int argc,
 #endif
 #ifdef CONFIG_ANDROID_BOOT_IMAGE
 	case IMAGE_FORMAT_ANDROID:
-		boot_img = buf;
-		vendor_boot_img = NULL;
-		if (IS_ENABLED(CONFIG_CMD_ABOOTIMG)) {
-			boot_img = map_sysmem(get_abootimg_addr(), 0);
-			vendor_boot_img = map_sysmem(get_avendor_bootimg_addr(), 0);
-		}
 		printf("## Booting Android Image at 0x%08lx ...\n", img_addr);
-		if (android_image_get_kernel(boot_img, vendor_boot_img, images->verify,
+		if (android_image_get_kernel(buf, images->verify,
 					     os_data, os_len))
 			return NULL;
-		if (IS_ENABLED(CONFIG_CMD_ABOOTIMG)) {
-			unmap_sysmem(vendor_boot_img);
-			unmap_sysmem(boot_img);
-		}
 		break;
 #endif
 	default:
@@ -1026,11 +1002,11 @@ static int bootm_host_load_image(const void *fit, int req_image_type,
 {
 	const char *fit_uname_config = NULL;
 	ulong data, len;
-	struct bootm_headers images;
+	bootm_headers_t images;
 	int noffset;
-	ulong load_end, buf_size;
+	ulong load_end;
 	uint8_t image_type;
-	uint8_t image_comp;
+	uint8_t imape_comp;
 	void *load_buf;
 	int ret;
 
@@ -1048,18 +1024,20 @@ static int bootm_host_load_image(const void *fit, int req_image_type,
 		return -EINVAL;
 	}
 
-	if (fit_image_get_comp(fit, noffset, &image_comp))
-		image_comp = IH_COMP_NONE;
+	if (fit_image_get_comp(fit, noffset, &imape_comp)) {
+		puts("Can't get image compression!\n");
+		return -EINVAL;
+	}
 
 	/* Allow the image to expand by a factor of 4, should be safe */
-	buf_size = (1 << 20) + len * 4;
-	load_buf = malloc(buf_size);
-	ret = image_decomp(image_comp, 0, data, image_type, load_buf,
-			   (void *)data, len, buf_size, &load_end);
+	load_buf = malloc((1 << 20) + len * 4);
+	ret = image_decomp(imape_comp, 0, data, image_type, load_buf,
+			   (void *)data, len, CONFIG_SYS_BOOTM_LEN,
+			   &load_end);
 	free(load_buf);
 
 	if (ret) {
-		ret = handle_decomp_error(image_comp, load_end - 0, buf_size, ret);
+		ret = handle_decomp_error(imape_comp, load_end - 0, ret);
 		if (ret != BOOTM_ERR_UNIMPLEMENTED)
 			return ret;
 	}

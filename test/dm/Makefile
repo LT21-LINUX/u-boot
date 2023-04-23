@@ -18,18 +18,13 @@ obj-$(CONFIG_UT_DM) += core.o
 obj-$(CONFIG_UT_DM) += read.o
 obj-$(CONFIG_UT_DM) += phys2bus.o
 ifneq ($(CONFIG_SANDBOX),)
-ifeq ($(CONFIG_ACPIGEN),y)
-obj-y += acpi.o
-obj-y += acpigen.o
-obj-y += acpi_dp.o
-obj-(CONFIG_DM_GPIO) += gpio.o
-obj-y += irq.o
-endif
+obj-$(CONFIG_ACPIGEN) += acpi.o
+obj-$(CONFIG_ACPIGEN) += acpigen.o
+obj-$(CONFIG_ACPIGEN) += acpi_dp.o
 obj-$(CONFIG_ADC) += adc.o
 obj-$(CONFIG_SOUND) += audio.o
 obj-$(CONFIG_AXI) += axi.o
 obj-$(CONFIG_BLK) += blk.o
-obj-$(CONFIG_BLKMAP) += blkmap.o
 obj-$(CONFIG_BUTTON) += button.o
 obj-$(CONFIG_DM_BOOTCOUNT) += bootcount.o
 obj-$(CONFIG_DM_REBOOT_MODE) += reboot-mode.o
@@ -48,19 +43,17 @@ ifneq ($(CONFIG_EFI_PARTITION),)
 obj-$(CONFIG_FASTBOOT_FLASH_MMC) += fastboot.o
 endif
 obj-$(CONFIG_FIRMWARE) += firmware.o
-obj-$(CONFIG_DM_FPGA) += fpga.o
-obj-$(CONFIG_FWU_MDATA_GPT_BLK) += fwu_mdata.o
-obj-$(CONFIG_SANDBOX) += host.o
+obj-$(CONFIG_DM_GPIO) += gpio.o
 obj-$(CONFIG_DM_HWSPINLOCK) += hwspinlock.o
 obj-$(CONFIG_DM_I2C) += i2c.o
 obj-$(CONFIG_SOUND) += i2s.o
+obj-y += irq.o
 obj-$(CONFIG_CLK_K210_SET_RATE) += k210_pll.o
 obj-$(CONFIG_IOMMU) += iommu.o
 obj-$(CONFIG_LED) += led.o
 obj-$(CONFIG_DM_MAILBOX) += mailbox.o
 obj-$(CONFIG_DM_MDIO) += mdio.o
 obj-$(CONFIG_DM_MDIO_MUX) += mdio_mux.o
-obj-$(CONFIG_MEMORY) += memory.o
 obj-$(CONFIG_MISC) += misc.o
 obj-$(CONFIG_DM_MMC) += mmc.o
 obj-$(CONFIG_CMD_MUX) += mux-cmd.o
@@ -72,7 +65,7 @@ obj-y += ofnode.o
 obj-y += ofread.o
 obj-y += of_extra.o
 obj-$(CONFIG_OSD) += osd.o
-obj-$(CONFIG_VIDEO) += panel.o
+obj-$(CONFIG_DM_VIDEO) += panel.o
 obj-$(CONFIG_EFI_PARTITION) += part.o
 obj-$(CONFIG_PCI) += pci.o
 obj-$(CONFIG_P2SB) += p2sb.o
@@ -96,7 +89,6 @@ obj-$(CONFIG_DM_REGULATOR) += regulator.o
 obj-$(CONFIG_DM_RNG) += rng.o
 obj-$(CONFIG_DM_RTC) += rtc.o
 obj-$(CONFIG_SCMI_FIRMWARE) += scmi.o
-obj-$(CONFIG_SCSI) += scsi.o
 obj-$(CONFIG_DM_SERIAL) += serial.o
 obj-$(CONFIG_DM_SPI_FLASH) += sf.o
 obj-$(CONFIG_SIMPLE_BUS) += simple-bus.o
@@ -113,14 +105,9 @@ obj-$(CONFIG_SYSINFO_GPIO) += sysinfo-gpio.o
 obj-$(CONFIG_UT_DM) += tag.o
 obj-$(CONFIG_TEE) += tee.o
 obj-$(CONFIG_TIMER) += timer.o
-obj-$(CONFIG_TPM_V2) += tpm.o
 obj-$(CONFIG_DM_USB) += usb.o
-obj-$(CONFIG_VIDEO) += video.o
-ifeq ($(CONFIG_VIRTIO_SANDBOX),y)
-obj-y += virtio.o
-obj-$(CONFIG_VIRTIO_RNG) += virtio_device.o
-obj-$(CONFIG_VIRTIO_RNG) += virtio_rng.o
-endif
+obj-$(CONFIG_DM_VIDEO) += video.o
+obj-$(CONFIG_VIRTIO_SANDBOX) += virtio.o
 ifeq ($(CONFIG_WDT_GPIO)$(CONFIG_WDT_SANDBOX),yy)
 obj-y += wdt.o
 endif

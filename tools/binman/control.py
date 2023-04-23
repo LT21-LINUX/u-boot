@@ -7,20 +7,18 @@
 
 from collections import OrderedDict
 import glob
-import importlib.resources
 import os
 import pkg_resources
 import re
 
 import sys
+from patman import tools
 
 from binman import bintool
 from binman import cbfs_util
 from binman import elf
-from binman import entry
-from u_boot_pylib import command
-from u_boot_pylib import tools
-from u_boot_pylib import tout
+from patman import command
+from patman import tout
 
 # These are imported if needed since they import libfdt
 state = None
@@ -217,7 +215,6 @@ def ReadEntry(image_fname, entry_path, decomp=True):
     from binman.image import Image
 
     image = Image.FromFile(image_fname)
-    image.CollectBintools()
     entry = image.FindEntryPath(entry_path)
     return entry.ReadData(decomp)
 
@@ -254,7 +251,6 @@ def ExtractEntries(image_fname, output_fname, outdir, entry_paths,
         List of EntryInfo records that were written
     """
     image = Image.FromFile(image_fname)
-    image.CollectBintools()
 
     if alt_format == 'list':
         ShowAltFormats(image)
@@ -374,7 +370,6 @@ def WriteEntry(image_fname, entry_path, data, do_compress=True,
     """
     tout.info("Write entry '%s', file '%s'" % (entry_path, image_fname))
     image = Image.FromFile(image_fname)
-    image.CollectBintools()
     entry = image.FindEntryPath(entry_path)
     WriteEntryToImage(image, entry, data, do_compress=do_compress,
                       allow_resize=allow_resize, write_map=write_map)
@@ -402,8 +397,6 @@ def ReplaceEntries(image_fname, input_fname, indir, entry_paths,
     """
     image_fname = os.path.abspath(image_fname)
     image = Image.FromFile(image_fname)
-
-    image.mark_build_done()
 
     # Replace an entry from a single file, as a special case
     if input_fname:
@@ -448,31 +441,6 @@ def ReplaceEntries(image_fname, input_fname, indir, entry_paths,
     AfterReplace(image, allow_resize=allow_resize, write_map=write_map)
     return image
 
-def SignEntries(image_fname, input_fname, privatekey_fname, algo, entry_paths,
-                write_map=False):
-    """Sign and replace the data from one or more entries from input files
-
-    Args:
-        image_fname: Image filename to process
-        input_fname: Single input filename to use if replacing one file, None
-            otherwise
-        algo: Hashing algorithm
-        entry_paths: List of entry paths to sign
-        privatekey_fname: Private key filename
-        write_map (bool): True to write the map file
-    """
-    image_fname = os.path.abspath(image_fname)
-    image = Image.FromFile(image_fname)
-
-    image.mark_build_done()
-
-    BeforeReplace(image, allow_resize=True)
-
-    for entry_path in entry_paths:
-        entry = image.FindEntryPath(entry_path)
-        entry.UpdateSignatures(privatekey_fname, algo, input_fname)
-
-    AfterReplace(image, allow_resize=True, write_map=write_map)
 
 def PrepareImagesAndDtbs(dtb_fname, select_images, update_fdt, use_expanded):
     """Prepare the images to be processed and select the device tree
@@ -539,8 +507,8 @@ def PrepareImagesAndDtbs(dtb_fname, select_images, update_fdt, use_expanded):
     # without changing the device-tree size, thus ensuring that our
     # entry offsets remain the same.
     for image in images.values():
-        image.gen_entries()
         image.CollectBintools()
+        image.gen_entries()
         if update_fdt:
             image.AddMissingProperties(True)
         image.ProcessFdt(dtb)
@@ -580,7 +548,6 @@ def ProcessImage(image, update_fdt, write_map, get_contents=True,
         image.SetAllowMissing(allow_missing)
         image.SetAllowFakeBlob(allow_fake_blobs)
         image.GetEntryContents()
-        image.drop_absent()
     image.GetEntryOffsets()
 
     # We need to pack the entries to figure out where everything
@@ -622,14 +589,12 @@ def ProcessImage(image, update_fdt, write_map, get_contents=True,
     image.BuildImage()
     if write_map:
         image.WriteMap()
-
     missing_list = []
     image.CheckMissing(missing_list)
     if missing_list:
         tout.warning("Image '%s' is missing external blobs and is non-functional: %s" %
                      (image.name, ' '.join([e.name for e in missing_list])))
         _ShowHelpForMissingBlobs(missing_list)
-
     faked_list = []
     image.CheckFakedBlobs(faked_list)
     if faked_list:
@@ -637,15 +602,6 @@ def ProcessImage(image, update_fdt, write_map, get_contents=True,
             "Image '%s' has faked external blobs and is non-functional: %s" %
             (image.name, ' '.join([os.path.basename(e.GetDefaultFilename())
                                    for e in faked_list])))
-
-    optional_list = []
-    image.CheckOptional(optional_list)
-    if optional_list:
-        tout.warning(
-            "Image '%s' is missing external blobs but is still functional: %s" %
-            (image.name, ' '.join([e.name for e in optional_list])))
-        _ShowHelpForMissingBlobs(optional_list)
-
     missing_bintool_list = []
     image.check_missing_bintools(missing_bintool_list)
     if missing_bintool_list:
@@ -669,29 +625,19 @@ def Binman(args):
     global state
 
     if args.full_help:
-        with importlib.resources.path('binman', 'README.rst') as readme:
-            tools.print_full_help(str(readme))
+        tools.print_full_help(
+            os.path.join(os.path.dirname(os.path.realpath(sys.argv[0])), 'README.rst')
+        )
         return 0
 
     # Put these here so that we can import this module without libfdt
     from binman.image import Image
     from binman import state
 
-    tool_paths = []
-    if args.toolpath:
-        tool_paths += args.toolpath
-    if args.tooldir:
-        tool_paths.append(args.tooldir)
-    tools.set_tool_paths(tool_paths or None)
-    bintool.Bintool.set_tool_dir(args.tooldir)
-
-    if args.cmd in ['ls', 'extract', 'replace', 'tool', 'sign']:
+    if args.cmd in ['ls', 'extract', 'replace', 'tool']:
         try:
             tout.init(args.verbosity)
-            if args.cmd == 'replace':
-                tools.prepare_output_dir(args.outdir, args.preserve)
-            else:
-                tools.prepare_output_dir(None)
+            tools.prepare_output_dir(None)
             if args.cmd == 'ls':
                 ListEntries(args.image, args.paths)
 
@@ -704,10 +650,8 @@ def Binman(args):
                                do_compress=not args.compressed,
                                allow_resize=not args.fix_size, write_map=args.map)
 
-            if args.cmd == 'sign':
-                SignEntries(args.image, args.file, args.key, args.algo, args.paths)
-
             if args.cmd == 'tool':
+                tools.set_tool_paths(args.toolpath)
                 if args.list:
                     bintool.Bintool.list_all()
                 elif args.fetch:
@@ -759,6 +703,7 @@ def Binman(args):
         try:
             tools.set_input_dirs(args.indir)
             tools.prepare_output_dir(args.outdir, args.preserve)
+            tools.set_tool_paths(args.toolpath)
             state.SetEntryArgs(args.entry_arg)
             state.SetThreads(args.threads)
 
@@ -772,13 +717,6 @@ def Binman(args):
             bintool.Bintool.set_missing_list(
                 args.force_missing_bintools.split(',') if
                 args.force_missing_bintools else None)
-
-            # Create the directory here instead of Entry.check_fake_fname()
-            # since that is called from a threaded context so different threads
-            # may race to create the directory
-            if args.fake_ext_blobs:
-                entry.Entry.create_fake_dir()
-
             for image in images.values():
                 invalid |= ProcessImage(image, args.update_fdt, args.map,
                                        allow_missing=args.allow_missing,
@@ -792,15 +730,8 @@ def Binman(args):
                 data = state.GetFdtForEtype('u-boot-dtb').GetContents()
                 elf.UpdateFile(*elf_params, data)
 
-            # This can only be True if -M is provided, since otherwise binman
-            # would have raised an error already
             if invalid:
-                msg = '\nSome images are invalid'
-                if args.ignore_missing:
-                    tout.warning(msg)
-                else:
-                    tout.error(msg)
-                    return 103
+                tout.warning("\nSome images are invalid")
 
             # Use this to debug the time take to pack the image
             #state.TimingShow()

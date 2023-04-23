@@ -850,20 +850,15 @@ end:
 
 fail:
 	free(depth_dirname);
-	if (parse_dirname)
-		free(parse_dirname);
-	if (ptr) {
-		for (i = 0; i < depth; i++) {
-			if (!ptr[i])
-				break;
-			free(ptr[i]);
-		}
-		free(ptr);
+	free(parse_dirname);
+	for (i = 0; i < depth; i++) {
+		if (!ptr[i])
+			break;
+		free(ptr[i]);
 	}
-	if (parent_inode)
-		free(parent_inode);
-	if (first_inode)
-		free(first_inode);
+	free(ptr);
+	free(parent_inode);
+	free(first_inode);
 
 	return result_inode_no;
 }
@@ -2373,10 +2368,6 @@ int ext4fs_mount(unsigned part_length)
 	struct ext2_data *data;
 	int status;
 	struct ext_filesystem *fs = get_fs();
-
-	if (part_length < SUPERBLOCK_SIZE)
-		return 0;
-
 	data = zalloc(SUPERBLOCK_SIZE);
 	if (!data)
 		return 0;
@@ -2424,7 +2415,7 @@ int ext4fs_mount(unsigned part_length)
 
 	return 1;
 fail:
-	log_debug("Failed to mount ext2 filesystem...\n");
+	printf("Failed to mount ext2 filesystem...\n");
 fail_noerr:
 	free(data);
 	ext4fs_root = NULL;

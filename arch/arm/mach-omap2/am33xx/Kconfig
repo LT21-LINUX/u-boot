@@ -8,6 +8,16 @@ config TARGET_TI816X_EVM
 
 endif
 
+if TI814X
+
+config TARGET_TI814X_EVM
+	bool "Support ti814x_evm"
+	help
+	  This option specifies support for the TI8148
+	  EVM development platform.
+
+endif
+
 if AM33XX
 
 config AM33XX_CHILISOM
@@ -84,8 +94,8 @@ config TARGET_AM335X_GUARDIAN
 	select DM
 	select DM_SERIAL
 	select DM_GPIO
-	select VIDEO
-	select PANEL_HX8238D
+	select DM_VIDEO
+	select DM_PANEL_HX8238D
 
 config TARGET_AM335X_SL50
 	bool "Support am335x_sl50"
@@ -115,13 +125,19 @@ config TARGET_CHILIBOARD
 	select DM_SERIAL
 	imply CMD_DM
 
+config TARGET_CM_T335
+	bool "Support cm_t335"
+	select DM
+	select DM_GPIO
+	select DM_SERIAL
+	imply CMD_DM
+
 config TARGET_DRACO
 	bool "Support draco"
 	select BOARD_LATE_INIT
 	select DM
 	select DM_GPIO
 	select DM_SERIAL
-	select FACTORYSET
 	imply CMD_DM
 
 config TARGET_ETAMIN
@@ -130,7 +146,6 @@ config TARGET_ETAMIN
 	select DM
 	select DM_GPIO
 	select DM_SERIAL
-	select FACTORYSET
 	imply CMD_DM
 
 config TARGET_PCM051
@@ -153,7 +168,6 @@ config TARGET_PXM2
 	select DM
 	select DM_GPIO
 	select DM_SERIAL
-	select FACTORYSET
 	imply CMD_DM
 
 config TARGET_RASTABAN
@@ -162,7 +176,6 @@ config TARGET_RASTABAN
 	select DM
 	select DM_GPIO
 	select DM_SERIAL
-	select FACTORYSET
 	imply CMD_DM
 
 config TARGET_RUT
@@ -171,7 +184,6 @@ config TARGET_RUT
 	select DM
 	select DM_GPIO
 	select DM_SERIAL
-	select FACTORYSET
 	imply CMD_DM
 
 config TARGET_THUBAN
@@ -180,7 +192,6 @@ config TARGET_THUBAN
 	select DM
 	select DM_GPIO
 	select DM_SERIAL
-	select FACTORYSET
 	imply CMD_DM
 
 config TARGET_PDU001
@@ -220,6 +231,7 @@ config TARGET_AM43XX_EVM
 	bool "Support am43xx_evm"
 	select BOARD_LATE_INIT
 	select TI_I2C_BOARD_DETECT
+	imply DM_ETH
 	imply DM_I2C
 	imply DM_SPI
 	imply DM_SPI_FLASH

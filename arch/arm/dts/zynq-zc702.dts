@@ -17,8 +17,6 @@
 		spi0 = &qspi;
 		mmc0 = &sdhci0;
 		usb0 = &usb0;
-		nvmem0 = &eeprom;
-		rtc0 = &rtc;
 	};
 
 	memory@0 {
@@ -34,14 +32,14 @@
 	gpio-keys {
 		compatible = "gpio-keys";
 		autorepeat;
-		switch-14 {
+		sw14 {
 			label = "sw14";
 			gpios = <&gpio0 12 0>;
 			linux,code = <108>; /* down */
 			wakeup-source;
 			autorepeat;
 		};
-		switch-13 {
+		sw13 {
 			label = "sw13";
 			gpios = <&gpio0 14 0>;
 			linux,code = <103>; /* up */
@@ -63,6 +61,19 @@
 	usb_phy0: phy0 {
 		compatible = "usb-nop-xceiv";
 		#phy-cells = <0>;
+	};
+};
+
+&amba {
+	ocm: sram@fffc0000 {
+		compatible = "mmio-sram";
+		reg = <0xfffc0000 0x10000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 0xfffc0000 0x10000>;
+		ocm-sram@0 {
+			reg = <0x0 0x10000>;
+		};
 	};
 };
 
@@ -144,7 +155,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <2>;
-			eeprom: eeprom@54 {
+			eeprom@54 {
 				compatible = "atmel,24c08";
 				reg = <0x54>;
 			};
@@ -166,7 +177,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			reg = <4>;
-			rtc: rtc@51 {
+			rtc@51 {
 				compatible = "nxp,pcf8563";
 				reg = <0x51>;
 			};
@@ -396,7 +407,7 @@
 };
 
 &qspi {
-	bootph-all;
+	u-boot,dm-pre-reloc;
 	status = "okay";
 	num-cs = <1>;
 	flash@0 {
@@ -409,14 +420,14 @@
 };
 
 &sdhci0 {
-	bootph-all;
+	u-boot,dm-pre-reloc;
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sdhci0_default>;
 };
 
 &uart1 {
-	bootph-all;
+	u-boot,dm-pre-reloc;
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart1_default>;

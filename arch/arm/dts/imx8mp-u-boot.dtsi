@@ -10,44 +10,44 @@
 	};
 };
 
-&soc {
-	bootph-all;
-	bootph-pre-ram;
+&{/soc@0} {
+	u-boot,dm-pre-reloc;
+	u-boot,dm-spl;
 };
 
 &clk {
-	bootph-pre-ram;
-	bootph-all;
+	u-boot,dm-spl;
+	u-boot,dm-pre-reloc;
 	/delete-property/ assigned-clocks;
 	/delete-property/ assigned-clock-parents;
 	/delete-property/ assigned-clock-rates;
 };
 
 &osc_32k {
-	bootph-pre-ram;
-	bootph-all;
+	u-boot,dm-spl;
+	u-boot,dm-pre-reloc;
 };
 
 &osc_24m {
-	bootph-pre-ram;
-	bootph-all;
+	u-boot,dm-spl;
+	u-boot,dm-pre-reloc;
 };
 
 &aips1 {
-	bootph-pre-ram;
-	bootph-all;
+	u-boot,dm-spl;
+	u-boot,dm-pre-reloc;
 };
 
 &aips2 {
-	bootph-pre-ram;
+	u-boot,dm-spl;
 };
 
 &aips3 {
-	bootph-pre-ram;
+	u-boot,dm-spl;
 };
 
 &iomuxc {
-	bootph-pre-ram;
+	u-boot,dm-spl;
 };
 
 &binman {
@@ -61,28 +61,24 @@
 			align-end = <4>;
 		};
 
-		ddr-1d-imem-fw {
+		blob_1: blob-ext@1 {
 			filename = "lpddr4_pmu_train_1d_imem_202006.bin";
-			type = "blob-ext";
-			align-end = <4>;
+			size = <0x8000>;
 		};
 
-		ddr-1d-dmem-fw {
+		blob_2: blob-ext@2 {
 			filename = "lpddr4_pmu_train_1d_dmem_202006.bin";
-			type = "blob-ext";
-			align-end = <4>;
+			size = <0x4000>;
 		};
 
-		ddr-2d-imem-fw {
+		blob_3: blob-ext@3 {
 			filename = "lpddr4_pmu_train_2d_imem_202006.bin";
-			type = "blob-ext";
-			align-end = <4>;
+			size = <0x8000>;
 		};
 
-		ddr-2d-dmem-fw {
+		blob_4: blob-ext@4 {
 			filename = "lpddr4_pmu_train_2d_dmem_202006.bin";
-			type = "blob-ext";
-			align-end = <4>;
+			size = <0x4000>;
 		};
 	};
 
@@ -113,14 +109,13 @@
 					type = "standalone";
 					arch = "arm64";
 					compression = "none";
-					load = <CONFIG_TEXT_BASE>;
+					load = <CONFIG_SYS_TEXT_BASE>;
 
 					uboot_blob: blob-ext {
 						filename = "u-boot-nodtb.bin";
 					};
 				};
 
-#ifndef CONFIG_ARMV8_PSCI
 				atf {
 					description = "ARM Trusted Firmware";
 					type = "firmware";
@@ -134,7 +129,6 @@
 						type = "atf-bl31";
 					};
 				};
-#endif
 
 				@fdt-SEQ {
 					description = "NAME";
@@ -150,13 +144,11 @@
 			configurations {
 				default = "@config-DEFAULT-SEQ";
 
-				binman_configuration: @config-SEQ {
+				@config-SEQ {
 					description = "NAME";
 					fdt = "fdt-SEQ";
 					firmware = "uboot";
-#ifndef CONFIG_ARMV8_PSCI
 					loadables = "atf";
-#endif
 				};
 			};
 		};

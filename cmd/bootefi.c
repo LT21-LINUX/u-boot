@@ -35,18 +35,6 @@ static void *image_addr;
 static size_t image_size;
 
 /**
- * efi_get_image_parameters() - return image parameters
- *
- * @img_addr:		address of loaded image in memory
- * @img_size:		size of loaded image
- */
-void efi_get_image_parameters(void **img_addr, size_t *img_size)
-{
-	*img_addr = image_addr;
-	*img_size = image_size;
-}
-
-/**
  * efi_clear_bootdev() - clear boot device
  */
 static void efi_clear_bootdev(void)
@@ -119,9 +107,9 @@ void efi_set_bootdev(const char *dev, const char *devnr, const char *path,
 			efi_free_pool(image_tmp);
 		}
 		bootefi_image_path = image;
-		log_debug("- boot device %pD\n", device);
+		log_debug("- recorded device %ls\n", efi_dp_str(device));
 		if (image)
-			log_debug("- image %pD\n", image);
+			log_debug("- and image %ls\n", efi_dp_str(image));
 	} else {
 		log_debug("- efi_dp_from_name() failed, err=%lx\n", ret);
 		efi_clear_bootdev();
@@ -204,12 +192,25 @@ static efi_status_t copy_fdt(void **fdtp)
 	fdt_pages = efi_size_in_pages(fdt_totalsize(fdt) + 0x3000);
 	fdt_size = fdt_pages << EFI_PAGE_SHIFT;
 
-	ret = efi_allocate_pages(EFI_ALLOCATE_ANY_PAGES,
+	/*
+	 * Safe fdt location is at 127 MiB.
+	 * On the sandbox convert from the sandbox address space.
+	 */
+	new_fdt_addr = (uintptr_t)map_sysmem(fdt_ram_start + 0x7f00000 +
+					     fdt_size, 0);
+	ret = efi_allocate_pages(EFI_ALLOCATE_MAX_ADDRESS,
 				 EFI_ACPI_RECLAIM_MEMORY, fdt_pages,
 				 &new_fdt_addr);
 	if (ret != EFI_SUCCESS) {
-		log_err("ERROR: Failed to reserve space for FDT\n");
-		goto done;
+		/* If we can't put it there, put it somewhere */
+		new_fdt_addr = (ulong)memalign(EFI_PAGE_SIZE, fdt_size);
+		ret = efi_allocate_pages(EFI_ALLOCATE_MAX_ADDRESS,
+					 EFI_ACPI_RECLAIM_MEMORY, fdt_pages,
+					 &new_fdt_addr);
+		if (ret != EFI_SUCCESS) {
+			log_err("ERROR: Failed to reserve space for FDT\n");
+			goto done;
+		}
 	}
 	new_fdt = (void *)(uintptr_t)new_fdt_addr;
 	memcpy(new_fdt, fdt, fdt_totalsize(fdt));
@@ -268,7 +269,7 @@ efi_status_t efi_install_fdt(void *fdt)
 		return EFI_SUCCESS;
 	}
 #else
-	struct bootm_headers img = { 0 };
+	bootm_headers_t img = { 0 };
 	efi_status_t ret;
 
 	if (fdt == EFI_FDT_USE_INTERNAL) {
@@ -318,14 +319,6 @@ efi_status_t efi_install_fdt(void *fdt)
 	efi_carve_out_dt_rsv(fdt);
 
 	efi_try_purge_kaslr_seed(fdt);
-
-	if (CONFIG_IS_ENABLED(EFI_TCG2_PROTOCOL_MEASURE_DTB)) {
-		ret = efi_tcg2_measure_dtb(fdt);
-		if (ret == EFI_SECURITY_VIOLATION) {
-			log_err("ERROR: failed to measure DTB\n");
-			return ret;
-		}
-	}
 
 	/* Install device tree as UEFI table */
 	ret = efi_install_configuration_table(&efi_guid_fdt, fdt);
@@ -389,10 +382,8 @@ static efi_status_t do_bootefi_exec(efi_handle_t handle, void *load_options)
 out:
 	free(load_options);
 
-	if (IS_ENABLED(CONFIG_EFI_LOAD_FILE2_INITRD)) {
-		if (efi_initrd_deregister() != EFI_SUCCESS)
-			log_err("Failed to remove loadfile2 for initrd\n");
-	}
+	if (IS_ENABLED(CONFIG_EFI_LOAD_FILE2_INITRD))
+		efi_initrd_deregister();
 
 	/* Control is returned to U-Boot, disable EFI watchdog */
 	efi_set_watchdog(0);
@@ -489,7 +480,7 @@ efi_status_t efi_run_image(void *source_buffer, efi_uintn_t source_size)
 	efi_handle_t mem_handle = NULL, handle;
 	struct efi_device_path *file_path = NULL;
 	struct efi_device_path *msg_path;
-	efi_status_t ret, ret2;
+	efi_status_t ret;
 	u16 *load_options;
 
 	if (!bootefi_device_path || !bootefi_image_path) {
@@ -506,9 +497,12 @@ efi_status_t efi_run_image(void *source_buffer, efi_uintn_t source_size)
 		 * Make sure that device for device_path exist
 		 * in load_image(). Otherwise, shell and grub will fail.
 		 */
-		ret = efi_install_multiple_protocol_interfaces(&mem_handle,
-							       &efi_guid_device_path,
-							       file_path, NULL);
+		ret = efi_create_handle(&mem_handle);
+		if (ret != EFI_SUCCESS)
+			goto out;
+
+		ret = efi_add_protocol(mem_handle, &efi_guid_device_path,
+				       file_path);
 		if (ret != EFI_SUCCESS)
 			goto out;
 		msg_path = file_path;
@@ -536,11 +530,9 @@ efi_status_t efi_run_image(void *source_buffer, efi_uintn_t source_size)
 	ret = do_bootefi_exec(handle, load_options);
 
 out:
-	ret2 = efi_uninstall_multiple_protocol_interfaces(mem_handle,
-							  &efi_guid_device_path,
-							  file_path, NULL);
+	efi_delete_handle(mem_handle);
 	efi_free_pool(file_path);
-	return (ret != EFI_SUCCESS) ? ret : ret2;
+	return ret;
 }
 
 #ifdef CONFIG_CMD_BOOTEFI_SELFTEST

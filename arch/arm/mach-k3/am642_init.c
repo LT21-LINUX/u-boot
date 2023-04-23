@@ -23,6 +23,8 @@
 #include <mmc.h>
 #include <dm/root.h>
 
+#if defined(CONFIG_SPL_BUILD)
+#define MCU_CTRL_MMR0_BASE			0x04500000
 #define CTRLMMR_MCU_RST_CTRL			0x04518170
 
 static void ctrl_mmr_unlock(void)
@@ -61,7 +63,7 @@ static struct rom_extended_boot_data bootdata __section(".data");
 static void store_boot_info_from_rom(void)
 {
 	bootindex = *(u32 *)(CONFIG_SYS_K3_BOOT_PARAM_TABLE_INDEX);
-	memcpy(&bootdata, (uintptr_t *)ROM_EXTENDED_BOOT_DATA_INFO,
+	memcpy(&bootdata, (uintptr_t *)ROM_ENTENDED_BOOT_DATA_INFO,
 	       sizeof(struct rom_extended_boot_data));
 }
 
@@ -100,7 +102,7 @@ void do_dt_magic(void)
 {
 	int ret, rescan;
 
-	if (IS_ENABLED(CONFIG_K3_BOARD_DETECT))
+	if (IS_ENABLED(CONFIG_TI_I2C_BOARD_DETECT))
 		do_board_detect();
 
 	/*
@@ -346,6 +348,7 @@ u32 spl_boot_device(void)
 	else
 		return __get_backup_bootmedia(devstat);
 }
+#endif
 
 #if defined(CONFIG_SYS_K3_SPL_ATF)
 

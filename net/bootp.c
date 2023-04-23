@@ -44,22 +44,22 @@
 #define PORT_BOOTPS	67		/* BOOTP server UDP port */
 #define PORT_BOOTPC	68		/* BOOTP client UDP port */
 
-#ifndef CFG_DHCP_MIN_EXT_LEN		/* minimal length of extension list */
-#define CFG_DHCP_MIN_EXT_LEN 64
+#ifndef CONFIG_DHCP_MIN_EXT_LEN		/* minimal length of extension list */
+#define CONFIG_DHCP_MIN_EXT_LEN 64
 #endif
 
-#ifndef CFG_BOOTP_ID_CACHE_SIZE
-#define CFG_BOOTP_ID_CACHE_SIZE 4
+#ifndef CONFIG_BOOTP_ID_CACHE_SIZE
+#define CONFIG_BOOTP_ID_CACHE_SIZE 4
 #endif
 
-u32		bootp_ids[CFG_BOOTP_ID_CACHE_SIZE];
+u32		bootp_ids[CONFIG_BOOTP_ID_CACHE_SIZE];
 unsigned int	bootp_num_ids;
 int		bootp_try;
 ulong		bootp_start;
 ulong		bootp_timeout;
 char net_nis_domain[32] = {0,}; /* Our NIS domain */
 char net_hostname[32] = {0,}; /* Our hostname */
-char net_root_path[CONFIG_BOOTP_MAX_ROOT_PATH_LEN] = {0,}; /* Our bootpath */
+char net_root_path[64] = {0,}; /* Our bootpath */
 
 static ulong time_taken_max;
 
@@ -611,8 +611,8 @@ static int dhcp_extended(u8 *e, int message_type, struct in_addr server_ip,
 	*e++  = 255;		/* End of the list */
 
 	/* Pad to minimal length */
-#ifdef	CFG_DHCP_MIN_EXT_LEN
-	while ((e - start) < CFG_DHCP_MIN_EXT_LEN)
+#ifdef	CONFIG_DHCP_MIN_EXT_LEN
+	while ((e - start) < CONFIG_DHCP_MIN_EXT_LEN)
 		*e++ = 0;
 #endif
 
@@ -1077,9 +1077,7 @@ static void dhcp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
 			    strlen(CONFIG_SYS_BOOTFILE_PREFIX)) == 0) {
 #endif	/* CONFIG_SYS_BOOTFILE_PREFIX */
 			dhcp_packet_process_options(bp);
-			if (CONFIG_IS_ENABLED(EFI_LOADER) &&
-			    IS_ENABLED(CONFIG_NETDEVICES))
-				efi_net_set_dhcp_ack(pkt, len);
+			efi_net_set_dhcp_ack(pkt, len);
 
 #if defined(CONFIG_SERVERIP_FROM_PROXYDHCP)
 			if (!net_server_ip.s_addr)

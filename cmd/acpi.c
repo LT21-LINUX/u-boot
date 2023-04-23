@@ -5,7 +5,6 @@
  */
 #include <common.h>
 #include <command.h>
-#include <display_options.h>
 #include <mapmem.h>
 #include <acpi/acpi_table.h>
 #include <asm/acpi_table.h>

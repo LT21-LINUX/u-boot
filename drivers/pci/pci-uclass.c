@@ -286,8 +286,6 @@ int pci_bus_write_config(struct udevice *bus, pci_dev_t bdf, int offset,
 	ops = pci_get_ops(bus);
 	if (!ops->write_config)
 		return -ENOSYS;
-	if (offset < 0 || offset >= 4096)
-		return -EINVAL;
 	return ops->write_config(bus, bdf, offset, value, size);
 }
 
@@ -366,14 +364,8 @@ int pci_bus_read_config(const struct udevice *bus, pci_dev_t bdf, int offset,
 	struct dm_pci_ops *ops;
 
 	ops = pci_get_ops(bus);
-	if (!ops->read_config) {
-		*valuep = pci_conv_32_to_size(~0, offset, size);
+	if (!ops->read_config)
 		return -ENOSYS;
-	}
-	if (offset < 0 || offset >= 4096) {
-		*valuep = pci_conv_32_to_size(0, offset, size);
-		return -EINVAL;
-	}
 	return ops->read_config(bus, bdf, offset, valuep, size);
 }
 
@@ -766,7 +758,7 @@ static int pci_find_and_bind_driver(struct udevice *parent,
 	if (ofnode_valid(dev_ofnode(parent)))
 		pci_dev_find_ofnode(parent, bdf, &node);
 
-	if (ofnode_valid(node) && !ofnode_is_enabled(node)) {
+	if (ofnode_valid(node) && !ofnode_is_available(node)) {
 		debug("%s: Ignoring disabled device\n", __func__);
 		return log_msg_ret("dis", -EPERM);
 	}
@@ -962,7 +954,7 @@ int pci_bind_bus_devices(struct udevice *bus)
 	return 0;
 }
 
-static int decode_regions(struct pci_controller *hose, ofnode parent_node,
+static void decode_regions(struct pci_controller *hose, ofnode parent_node,
 			   ofnode node)
 {
 	int pci_addr_cells, addr_cells, size_cells;
@@ -976,7 +968,7 @@ static int decode_regions(struct pci_controller *hose, ofnode parent_node,
 	prop = ofnode_get_property(node, "ranges", &len);
 	if (!prop) {
 		debug("%s: Cannot decode regions\n", __func__);
-		return -EINVAL;
+		return;
 	}
 
 	pci_addr_cells = ofnode_read_simple_addr_cells(node);
@@ -994,8 +986,6 @@ static int decode_regions(struct pci_controller *hose, ofnode parent_node,
 	max_regions = len / cells_per_record + CONFIG_NR_DRAM_BANKS;
 	hose->regions = (struct pci_region *)
 		calloc(1, max_regions * sizeof(struct pci_region));
-	if (!hose->regions)
-		return -ENOMEM;
 
 	for (i = 0; i < max_regions; i++, len -= cells_per_record) {
 		u64 pci_addr, addr, size;
@@ -1063,7 +1053,7 @@ static int decode_regions(struct pci_controller *hose, ofnode parent_node,
 	/* Add a region for our local memory */
 	bd = gd->bd;
 	if (!bd)
-		return 0;
+		return;
 
 	for (i = 0; i < CONFIG_NR_DRAM_BANKS; ++i) {
 		if (bd->bi_dram[i].size) {
@@ -1078,7 +1068,7 @@ static int decode_regions(struct pci_controller *hose, ofnode parent_node,
 		}
 	}
 
-	return 0;
+	return;
 }
 
 static int pci_uclass_pre_probe(struct udevice *bus)
@@ -1107,10 +1097,7 @@ static int pci_uclass_pre_probe(struct udevice *bus)
 	/* For bridges, use the top-level PCI controller */
 	if (!device_is_on_pci_bus(bus)) {
 		hose->ctlr = bus;
-		ret = decode_regions(hose, dev_ofnode(bus->parent),
-				     dev_ofnode(bus));
-		if (ret)
-			return ret;
+		decode_regions(hose, dev_ofnode(bus->parent), dev_ofnode(bus));
 	} else {
 		struct pci_controller *parent_hose;
 
@@ -1211,19 +1198,22 @@ static int pci_bridge_write_config(struct udevice *bus, pci_dev_t bdf,
 static int skip_to_next_device(struct udevice *bus, struct udevice **devp)
 {
 	struct udevice *dev;
+	int ret = 0;
 
 	/*
 	 * Scan through all the PCI controllers. On x86 there will only be one
 	 * but that is not necessarily true on other hardware.
 	 */
-	while (bus) {
+	do {
 		device_find_first_child(bus, &dev);
 		if (dev) {
 			*devp = dev;
 			return 0;
 		}
-		uclass_next_device(&bus);
-	}
+		ret = uclass_next_device(&bus);
+		if (ret)
+			return ret;
+	} while (bus);
 
 	return 0;
 }
@@ -1232,6 +1222,7 @@ int pci_find_next_device(struct udevice **devp)
 {
 	struct udevice *child = *devp;
 	struct udevice *bus = child->parent;
+	int ret;
 
 	/* First try all the siblings */
 	*devp = NULL;
@@ -1244,7 +1235,9 @@ int pci_find_next_device(struct udevice **devp)
 	}
 
 	/* We ran out of siblings. Try the next bus */
-	uclass_next_device(&bus);
+	ret = uclass_next_device(&bus);
+	if (ret)
+		return ret;
 
 	return bus ? skip_to_next_device(bus, devp) : 0;
 }
@@ -1252,9 +1245,12 @@ int pci_find_next_device(struct udevice **devp)
 int pci_find_first_device(struct udevice **devp)
 {
 	struct udevice *bus;
+	int ret;
 
 	*devp = NULL;
-	uclass_first_device(UCLASS_PCI, &bus);
+	ret = uclass_first_device(UCLASS_PCI, &bus);
+	if (ret)
+		return ret;
 
 	return skip_to_next_device(bus, devp);
 }
@@ -1768,9 +1764,10 @@ int pci_sriov_init(struct udevice *pdev, int vf_en)
 
 	bdf = dm_pci_get_bdf(pdev);
 
-	ret = pci_get_bus(PCI_BUS(bdf), &bus);
-	if (ret)
-		return ret;
+	pci_get_bus(PCI_BUS(bdf), &bus);
+
+	if (!bus)
+		return -ENODEV;
 
 	bdf += PCI_BDF(0, 0, vf_offset);
 

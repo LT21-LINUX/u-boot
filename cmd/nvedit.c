@@ -51,6 +51,7 @@ DECLARE_GLOBAL_DATA_PTR;
 	defined(CONFIG_ENV_IS_IN_NAND)		|| \
 	defined(CONFIG_ENV_IS_IN_NVRAM)		|| \
 	defined(CONFIG_ENV_IS_IN_ONENAND)	|| \
+	defined(CONFIG_ENV_IS_IN_SATA)		|| \
 	defined(CONFIG_ENV_IS_IN_SPI_FLASH)	|| \
 	defined(CONFIG_ENV_IS_IN_REMOTE)	|| \
 	defined(CONFIG_ENV_IS_IN_UBI)
@@ -231,7 +232,7 @@ static int _do_env_set(int flag, int argc, char *const argv[], int env_flag)
 
 	debug("Initial value for argc=%d\n", argc);
 
-#if !IS_ENABLED(CONFIG_SPL_BUILD) && IS_ENABLED(CONFIG_CMD_NVEDIT_EFI)
+#if CONFIG_IS_ENABLED(CMD_NVEDIT_EFI)
 	if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'e')
 		return do_env_set_efi(NULL, flag, --argc, ++argv);
 #endif
@@ -1025,7 +1026,6 @@ static int do_env_indirect(struct cmd_tbl *cmdtp, int flag,
 	char *from = argv[2];
 	char *default_value = NULL;
 	int ret = 0;
-	char *val;
 
 	if (argc < 3 || argc > 4) {
 		return CMD_RET_USAGE;
@@ -1035,14 +1035,18 @@ static int do_env_indirect(struct cmd_tbl *cmdtp, int flag,
 		default_value = argv[3];
 	}
 
-	val = env_get(from) ?: default_value;
-	if (!val) {
+	if (env_get(from) == NULL && default_value == NULL) {
 		printf("## env indirect: Environment variable for <from> (%s) does not exist.\n", from);
 
 		return CMD_RET_FAILURE;
 	}
 
-	ret = env_set(to, val);
+	if (env_get(from) == NULL) {
+		ret = env_set(to, default_value);
+	}
+	else {
+		ret = env_set(to, env_get(from));
+	}
 
 	if (ret == 0) {
 		return CMD_RET_SUCCESS;

@@ -13,7 +13,21 @@
 
 #include <linux/sizes.h>
 
-#if IS_ENABLED(CONFIG_CMD_USB)
+/* SPL Loader Configuration */
+#define CONFIG_SYS_INIT_SP_ADDR		(CONFIG_SPL_TEXT_BASE + \
+					 CONFIG_SYS_K3_NON_SECURE_MSRAM_SIZE)
+
+#define CONFIG_SPL_MAX_SIZE		CONFIG_SYS_K3_MAX_DOWNLODABLE_IMAGE_SIZE
+
+#define CONFIG_SYS_BOOTM_LEN		SZ_64M
+
+/* U-Boot general configuration */
+#define EXTRA_ENV_IOT2050_BOARD_SETTINGS				\
+	"usb_pgood_delay=900\0"
+
+#ifndef CONFIG_SPL_BUILD
+
+#if CONFIG_IS_ENABLED(CMD_USB)
 # define BOOT_TARGET_USB(func) \
 	func(USB, usb, 0) \
 	func(USB, usb, 1) \
@@ -34,18 +48,13 @@
 
 #include <config_distro_bootcmd.h>
 
-#define CFG_EXTRA_ENV_SETTINGS						\
+#endif
+
+#define CONFIG_EXTRA_ENV_SETTINGS					\
 	DEFAULT_LINUX_BOOT_ENV						\
-	BOOTENV
+	BOOTENV								\
+	EXTRA_ENV_IOT2050_BOARD_SETTINGS
 
 #include <configs/ti_armv7_common.h>
-
-#ifdef CONFIG_ENV_WRITEABLE_LIST
-#define CFG_ENV_FLAGS_LIST_STATIC					\
-	"board_uuid:sw,board_name:sw,board_serial:sw,board_a5e:sw,"	\
-	"mlfb:sw,fw_version:sw,seboot_version:sw,"			\
-	"m2_manuel_config:sw,"						\
-	"eth1addr:mw,eth2addr:mw,watchdog_timeout_ms:dw,boot_targets:sw"
-#endif
 
 #endif /* __CONFIG_IOT2050_H */

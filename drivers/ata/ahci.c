@@ -211,8 +211,8 @@ static int ahci_host_init(struct ahci_uc_priv *uc_priv)
 	      uc_priv->cap, uc_priv->port_map, uc_priv->n_ports);
 
 #if !defined(CONFIG_DM_SCSI)
-	if (uc_priv->n_ports > CONFIG_SYS_SATA_MAX_PORTS)
-		uc_priv->n_ports = CONFIG_SYS_SATA_MAX_PORTS;
+	if (uc_priv->n_ports > CONFIG_SYS_SCSI_MAX_SCSI_ID)
+		uc_priv->n_ports = CONFIG_SYS_SCSI_MAX_SCSI_ID;
 #endif
 
 	for (i = 0; i < uc_priv->n_ports; i++) {
@@ -674,12 +674,6 @@ static int ata_scsiop_inquiry(struct ahci_uc_priv *uc_priv,
 
 	/* Read id from sata */
 	port = pccb->target;
-
-	/* If this port number is not valid, give up */
-	if (!(uc_priv->port_map & (1 << port))) {
-		debug("Port %x not valid in map %x\n", port, uc_priv->port_map);
-		return -ENODEV;
-	}
 
 	if (ahci_device_data_io(uc_priv, port, (u8 *)&fis, sizeof(fis),
 				(u8 *)tmpid, ATA_ID_WORDS * 2, 0)) {

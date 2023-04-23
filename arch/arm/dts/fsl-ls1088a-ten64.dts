@@ -20,8 +20,6 @@
 	compatible = "traverse,ten64", "fsl,ls1088a";
 
 	aliases {
-		serial0 = &duart0;
-		serial1 = &duart1;
 		spi0 = &qspi;
 	};
 
@@ -166,11 +164,11 @@
 	status = "okay";
 };
 
-&duart0 {
+&serial0 {
 	status = "okay";
 };
 
-&duart1 {
+&serial1 {
 	status = "okay";
 };
 

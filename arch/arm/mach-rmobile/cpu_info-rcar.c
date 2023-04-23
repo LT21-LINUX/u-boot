@@ -14,10 +14,11 @@
 
 static u32 rmobile_get_prr(void)
 {
-	if (IS_ENABLED(CONFIG_RCAR_64))
-		return readl(0xFFF00044);
-
+#ifdef CONFIG_RCAR_GEN3
+	return readl(0xFFF00044);
+#else
 	return readl(0xFF000044);
+#endif
 }
 
 u32 rmobile_get_cpu_type(void)

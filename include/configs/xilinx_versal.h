@@ -14,8 +14,10 @@
 #define GICD_BASE	0xF9000000
 #define GICR_BASE	0xF9080000
 
+#define CONFIG_SYS_INIT_SP_ADDR		CONFIG_SYS_TEXT_BASE
+
 /* Serial setup */
-#define CFG_SYS_BAUDRATE_TABLE \
+#define CONFIG_SYS_BAUDRATE_TABLE \
 	{ 4800, 9600, 19200, 38400, 57600, 115200 }
 
 /* GUID for capsule updatable firmware image */
@@ -23,14 +25,25 @@
 	EFI_GUID(0x20c5fba5, 0x0171, 0x457f, 0xb9, 0xcd, \
 		 0xf5, 0x12, 0x9c, 0xd0, 0x72, 0x28)
 
+/* Miscellaneous configurable options */
+
+/* Monitor Command Prompt */
+/* Console I/O Buffer Size */
+#define CONFIG_SYS_CBSIZE		2048
+#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
+#define CONFIG_SYS_MAXARGS		64
+
 #if defined(CONFIG_CMD_DFU)
 #define DFU_DEFAULT_POLL_TIMEOUT	300
+#define CONFIG_THOR_RESET_OFF
 #endif
 
 /* Ethernet driver */
 #if defined(CONFIG_ZYNQ_GEM)
 # define PHY_ANEG_TIMEOUT       20000
 #endif
+
+#define CONFIG_SYS_BOOTM_LEN	(100 * 1024 * 1024)
 
 #define ENV_MEM_LAYOUT_SETTINGS \
 	"fdt_addr_r=0x40000000\0" \
@@ -126,8 +139,8 @@
 #include <config_distro_bootcmd.h>
 
 /* Initial environment variables */
-#ifndef CFG_EXTRA_ENV_SETTINGS
-#define CFG_EXTRA_ENV_SETTINGS \
+#ifndef CONFIG_EXTRA_ENV_SETTINGS
+#define CONFIG_EXTRA_ENV_SETTINGS \
 	ENV_MEM_LAYOUT_SETTINGS \
 	BOOTENV
 #endif

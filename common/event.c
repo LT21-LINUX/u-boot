@@ -17,7 +17,6 @@
 #include <malloc.h>
 #include <asm/global_data.h>
 #include <linux/list.h>
-#include <relocate.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -35,12 +34,6 @@ const char *const type_name[] = {
 
 	/* init hooks */
 	"misc_init_f",
-
-	/* fdt hooks */
-	"ft_fixup",
-
-	/* main loop events */
-	"main_loop",
 };
 
 _Static_assert(ARRAY_SIZE(type_name) == EVT_COUNT, "event type_name size");
@@ -123,7 +116,7 @@ int event_notify(enum event_t type, void *data, int size)
 
 	ret = notify_static(&event);
 	if (ret)
-		return log_msg_ret("sta", ret);
+		return log_msg_ret("dyn", ret);
 
 	if (CONFIG_IS_ENABLED(EVENT_DYNAMIC)) {
 		ret = notify_dynamic(&event);
@@ -155,20 +148,6 @@ void event_show_spy_list(void)
 	}
 }
 
-#if IS_ENABLED(CONFIG_NEEDS_MANUAL_RELOC)
-int event_manual_reloc(void)
-{
-	struct evspy_info *spy, *end;
-
-	spy = ll_entry_start(struct evspy_info, evspy_info);
-	end = ll_entry_end(struct evspy_info, evspy_info);
-	for (; spy < end; spy++)
-		MANUAL_RELOC(spy->func);
-
-	return 0;
-}
-#endif
-
 #if CONFIG_IS_ENABLED(EVENT_DYNAMIC)
 static void spy_free(struct event_spy *spy)
 {
@@ -180,6 +159,8 @@ int event_register(const char *id, enum event_t type, event_handler_t func, void
 	struct event_state *state = gd_event_state();
 	struct event_spy *spy;
 
+	if (!CONFIG_IS_ENABLED(EVENT_DYNAMIC))
+		return -ENOSYS;
 	spy = malloc(sizeof(*spy));
 	if (!spy)
 		return log_msg_ret("alloc", -ENOMEM);

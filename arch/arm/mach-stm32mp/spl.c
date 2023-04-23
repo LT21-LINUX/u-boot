@@ -190,7 +190,6 @@ void board_init_f(ulong dummy)
 	int ret;
 
 	arch_cpu_init();
-	mach_cpu_init();
 
 	ret = spl_early_init();
 	if (ret) {

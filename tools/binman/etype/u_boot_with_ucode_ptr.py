@@ -11,8 +11,8 @@ from binman import elf
 from binman.entry import Entry
 from binman.etype.blob import Entry_blob
 from dtoc import fdt_util
-from u_boot_pylib import tools
-from u_boot_pylib import command
+from patman import tools
+from patman import command
 
 class Entry_u_boot_with_ucode_ptr(Entry_blob):
     """U-Boot with embedded microcode pointer
@@ -62,7 +62,7 @@ class Entry_u_boot_with_ucode_ptr(Entry_blob):
         #
         # The section must be set up so that U-Boot is placed at the
         # flash address to which it is linked. For example, if
-        # CONFIG_TEXT_BASE is 0xfff00000, and the ROM is 8MB, then
+        # CONFIG_SYS_TEXT_BASE is 0xfff00000, and the ROM is 8MB, then
         # the U-Boot region must start at offset 7MB in the section. In this
         # case the ROM starts at 0xff800000, so the offset of the first
         # entry in the section corresponds to that.

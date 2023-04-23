@@ -13,15 +13,13 @@
 #include <env.h>
 #include <linker_lists.h>
 
-#include <linux/compiler_attributes.h>
-
 #ifndef NULL
 #define NULL	0
 #endif
 
 /* Default to a width of 8 characters for help message command width */
-#ifndef CFG_SYS_HELP_CMD_WIDTH
-#define CFG_SYS_HELP_CMD_WIDTH	10
+#ifndef CONFIG_SYS_HELP_CMD_WIDTH
+#define CONFIG_SYS_HELP_CMD_WIDTH	10
 #endif
 
 #ifndef	__ASSEMBLY__
@@ -150,9 +148,9 @@ int cmd_get_data_size(char *arg, int default_size);
 int do_bootd(struct cmd_tbl *cmdtp, int flag, int argc,
 	     char *const argv[]);
 #endif
+#ifdef CONFIG_CMD_BOOTM
 int do_bootm(struct cmd_tbl *cmdtp, int flag, int argc,
 	     char *const argv[]);
-#ifdef CONFIG_CMD_BOOTM
 int bootm_maybe_autostart(struct cmd_tbl *cmdtp, const char *cmd);
 #else
 static inline int bootm_maybe_autostart(struct cmd_tbl *cmdtp, const char *cmd)
@@ -231,10 +229,10 @@ enum command_ret_t {
  *			is left unchanged.
  * @param ticks		If ticks is not null, this function set it to the
  *			number of ticks the command took to complete.
- * Return: 0 if command succeeded, else non-zero (CMD_RET_...)
+ * Return: 0 if the command succeeded, 1 if it failed
  */
-enum command_ret_t cmd_process(int flag, int argc, char *const argv[],
-			       int *repeatable, unsigned long *ticks);
+int cmd_process(int flag, int argc, char *const argv[], int *repeatable,
+		unsigned long *ticks);
 
 void fixup_cmdtable(struct cmd_tbl *cmdtp, int size);
 
@@ -260,21 +258,6 @@ int run_command(const char *cmd, int flag);
 int run_command_repeatable(const char *cmd, int flag);
 
 /**
- * run_commandf() - Run a command created by a format string
- *
- * @fmt: printf() format string
- * @...: Arguments to use (flag is always 0)
- *
- * The command cannot be larger than (CONFIG_SYS_CBSIZE - 1) characters.
- *
- * Return:
- * Returns 0 on success, -EIO if internal output error occurred, -ENOSPC in
- *	case of 'fmt' string truncation, or != 0 on error, specific for
- *	run_command().
- */
-int run_commandf(const char *fmt, ...) __printf(1, 2);
-
-/**
  * Run a list of commands separated by ; or even \0
  *
  * Note that if 'len' is not -1, then the command does not need to be nul
@@ -286,18 +269,6 @@ int run_commandf(const char *fmt, ...) __printf(1, 2);
  * Return: 0 on success, or != 0 on error.
  */
 int run_command_list(const char *cmd, int len, int flag);
-
-/**
- * cmd_source_script() - Execute a script
- *
- * Executes a U-Boot script at a particular address in memory. The script should
- * have a header (FIT or legacy) with the script type (IH_TYPE_SCRIPT).
- *
- * @addr: Address of script
- * @fit_uname: FIT subimage name
- * Return: result code (enum command_ret_t)
- */
-int cmd_source_script(ulong addr, const char *fit_uname, const char *confname);
 #endif	/* __ASSEMBLY__ */
 
 /*
@@ -383,7 +354,7 @@ int cmd_source_script(ulong addr, const char *fit_uname, const char *confname);
 	U_BOOT_SUBCMDS_DO_CMD(_cmdname)					\
 	U_BOOT_SUBCMDS_COMPLETE(_cmdname)
 
-#if CONFIG_IS_ENABLED(CMDLINE)
+#ifdef CONFIG_CMDLINE
 #define U_BOOT_CMDREP_MKENT_COMPLETE(_name, _maxargs, _cmd_rep,		\
 				     _usage, _help, _comp)		\
 		{ #_name, _maxargs, _cmd_rep, cmd_discard_repeatable,	\

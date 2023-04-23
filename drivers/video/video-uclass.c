@@ -64,13 +64,6 @@ struct video_uc_priv {
 	ulong video_ptr;
 };
 
-/** struct vid_rgb - Describes a video colour */
-struct vid_rgb {
-	u32 r;
-	u32 g;
-	u32 b;
-};
-
 void video_set_flush_dcache(struct udevice *dev, bool flush)
 {
 	struct video_priv *priv = dev_get_uclass_priv(dev);
@@ -78,40 +71,24 @@ void video_set_flush_dcache(struct udevice *dev, bool flush)
 	priv->flush_dcache = flush;
 }
 
-static ulong alloc_fb_(ulong align, ulong size, ulong *addrp)
-{
-	ulong base;
-
-	align = align ? align : 1 << 20;
-	base = *addrp - size;
-	base &= ~(align - 1);
-	size = *addrp - base;
-	*addrp = base;
-
-	return size;
-}
-
 static ulong alloc_fb(struct udevice *dev, ulong *addrp)
 {
 	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
-	ulong size;
+	ulong base, align, size;
 
-	if (!plat->size) {
-		if (IS_ENABLED(CONFIG_VIDEO_COPY) && plat->copy_size) {
-			size = alloc_fb_(plat->align, plat->copy_size, addrp);
-			plat->copy_base = *addrp;
-			return size;
-		}
-
+	if (!plat->size)
 		return 0;
-	}
 
 	/* Allow drivers to allocate the frame buffer themselves */
 	if (plat->base)
 		return 0;
 
-	size = alloc_fb_(plat->align, plat->size, addrp);
-	plat->base = *addrp;
+	align = plat->align ? plat->align : 1 << 20;
+	base = *addrp - plat->size;
+	base &= ~(align - 1);
+	plat->base = base;
+	size = *addrp - base;
+	*addrp = base;
 
 	return size;
 }
@@ -142,7 +119,7 @@ int video_reserve(ulong *addrp)
 	return 0;
 }
 
-int video_fill(struct udevice *dev, u32 colour)
+int video_clear(struct udevice *dev)
 {
 	struct video_priv *priv = dev_get_uclass_priv(dev);
 	int ret;
@@ -154,7 +131,7 @@ int video_fill(struct udevice *dev, u32 colour)
 			u16 *end = priv->fb + priv->fb_size;
 
 			while (ppix < end)
-				*ppix++ = colour;
+				*ppix++ = priv->colour_bg;
 			break;
 		}
 	case VIDEO_BPP32:
@@ -163,11 +140,11 @@ int video_fill(struct udevice *dev, u32 colour)
 			u32 *end = priv->fb + priv->fb_size;
 
 			while (ppix < end)
-				*ppix++ = colour;
+				*ppix++ = priv->colour_bg;
 			break;
 		}
 	default:
-		memset(priv->fb, colour, priv->fb_size);
+		memset(priv->fb, priv->colour_bg, priv->fb_size);
 		break;
 	}
 	ret = video_sync_copy(dev, priv->fb, priv->fb + priv->fb_size);
@@ -175,73 +152,6 @@ int video_fill(struct udevice *dev, u32 colour)
 		return ret;
 
 	return video_sync(dev, false);
-}
-
-int video_clear(struct udevice *dev)
-{
-	struct video_priv *priv = dev_get_uclass_priv(dev);
-	int ret;
-
-	ret = video_fill(dev, priv->colour_bg);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-static const struct vid_rgb colours[VID_COLOUR_COUNT] = {
-	{ 0x00, 0x00, 0x00 },  /* black */
-	{ 0xc0, 0x00, 0x00 },  /* red */
-	{ 0x00, 0xc0, 0x00 },  /* green */
-	{ 0xc0, 0x60, 0x00 },  /* brown */
-	{ 0x00, 0x00, 0xc0 },  /* blue */
-	{ 0xc0, 0x00, 0xc0 },  /* magenta */
-	{ 0x00, 0xc0, 0xc0 },  /* cyan */
-	{ 0xc0, 0xc0, 0xc0 },  /* light gray */
-	{ 0x80, 0x80, 0x80 },  /* gray */
-	{ 0xff, 0x00, 0x00 },  /* bright red */
-	{ 0x00, 0xff, 0x00 },  /* bright green */
-	{ 0xff, 0xff, 0x00 },  /* yellow */
-	{ 0x00, 0x00, 0xff },  /* bright blue */
-	{ 0xff, 0x00, 0xff },  /* bright magenta */
-	{ 0x00, 0xff, 0xff },  /* bright cyan */
-	{ 0xff, 0xff, 0xff },  /* white */
-};
-
-u32 video_index_to_colour(struct video_priv *priv, unsigned int idx)
-{
-	switch (priv->bpix) {
-	case VIDEO_BPP16:
-		if (IS_ENABLED(CONFIG_VIDEO_BPP16)) {
-			return ((colours[idx].r >> 3) << 11) |
-			       ((colours[idx].g >> 2) <<  5) |
-			       ((colours[idx].b >> 3) <<  0);
-		}
-		break;
-	case VIDEO_BPP32:
-		if (IS_ENABLED(CONFIG_VIDEO_BPP32)) {
-			if (priv->format == VIDEO_X2R10G10B10)
-				return (colours[idx].r << 22) |
-				       (colours[idx].g << 12) |
-				       (colours[idx].b <<  2);
-			else
-				return (colours[idx].r << 16) |
-				       (colours[idx].g <<  8) |
-				       (colours[idx].b <<  0);
-		}
-		break;
-	default:
-		break;
-	}
-
-	/*
-	 * For unknown bit arrangements just support
-	 * black and white.
-	 */
-	if (idx)
-		return 0xffffff; /* white */
-
-	return 0x000000; /* black */
 }
 
 void video_set_default_colors(struct udevice *dev, bool invert)
@@ -266,8 +176,8 @@ void video_set_default_colors(struct udevice *dev, bool invert)
 	}
 	priv->fg_col_idx = fore;
 	priv->bg_col_idx = back;
-	priv->colour_fg = video_index_to_colour(priv, fore);
-	priv->colour_bg = video_index_to_colour(priv, back);
+	priv->colour_fg = vid_console_color(priv, fore);
+	priv->colour_bg = vid_console_color(priv, back);
 }
 
 /* Flush video activity to the caches */
@@ -422,11 +332,6 @@ int video_sync_copy_all(struct udevice *dev)
 
 SPLASH_DECL(u_boot_logo);
 
-void *video_get_u_boot_logo(void)
-{
-	return SPLASH_START(u_boot_logo);
-}
-
 static int show_splash(struct udevice *dev)
 {
 	u8 *data = SPLASH_START(u_boot_logo);
@@ -435,17 +340,6 @@ static int show_splash(struct udevice *dev)
 	ret = video_bmp_display(dev, map_to_sysmem(data), -4, 4, true);
 
 	return 0;
-}
-
-int video_default_font_height(struct udevice *dev)
-{
-	struct vidconsole_priv *vc_priv = dev_get_uclass_priv(dev);
-
-	if (IS_ENABLED(CONFIG_CONSOLE_TRUETYPE))
-		return IF_ENABLED_INT(CONFIG_CONSOLE_TRUETYPE,
-				      CONFIG_CONSOLE_TRUETYPE_SIZE);
-
-	return vc_priv->y_charsize;
 }
 
 /* Set up the display ready for use */
@@ -545,8 +439,8 @@ static int video_post_bind(struct udevice *dev)
 	addr = uc_priv->video_ptr;
 	size = alloc_fb(dev, &addr);
 	if (addr < gd->video_bottom) {
-		/* Device tree node may need the 'bootph-all' or
-		 * 'bootph-some-ram' tag
+		/* Device tree node may need the 'u-boot,dm-pre-reloc' or
+		 * 'u-boot,dm-pre-proper' tag
 		 */
 		printf("Video device '%s' cannot allocate frame buffer memory -ensure the device is set up before relocation\n",
 		       dev->name);
